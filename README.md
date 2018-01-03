@@ -1,2 +1,2 @@
 # pan-dl4j
-dl4j-extension
+在dl4j基础上实现一些算法，现根据GRU前向公式推导反向公式，并在dl4j中实现。
