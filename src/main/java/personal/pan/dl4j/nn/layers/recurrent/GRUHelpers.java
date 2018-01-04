@@ -15,6 +15,11 @@ import org.deeplearning4j.util.Dropout;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.blas.Level1;
 import org.nd4j.linalg.api.memory.MemoryWorkspace;
+import org.nd4j.linalg.api.memory.conf.WorkspaceConfiguration;
+import org.nd4j.linalg.api.memory.enums.AllocationPolicy;
+import org.nd4j.linalg.api.memory.enums.LearningPolicy;
+import org.nd4j.linalg.api.memory.enums.ResetPolicy;
+import org.nd4j.linalg.api.memory.enums.SpillPolicy;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.impl.transforms.TimesOneMinus;
 import org.nd4j.linalg.api.shape.Shape;
@@ -29,6 +34,11 @@ import org.nd4j.linalg.primitives.Pair;
  *
  */
 public class GRUHelpers {
+
+	public final static WorkspaceConfiguration workspaceConfigurationGRU = WorkspaceConfiguration.builder()
+			.initialSize(0).overallocationLimit(0.2).policyReset(ResetPolicy.BLOCK_LEFT)
+			.policyAllocation(AllocationPolicy.OVERALLOCATE).policySpill(SpillPolicy.REALLOCATE)
+			.policyLearning(LearningPolicy.FIRST_LOOP).build();
 
 	public static GRUFwdPassReturn activateHelper(final GRU layer, final NeuralNetConfiguration conf,
 			final IActivation gateActivationFn, final INDArray input, final INDArray recurrentWeights,
@@ -248,12 +258,12 @@ public class GRUHelpers {
 
 		MemoryWorkspace workspace = Nd4j.getMemoryManager().getCurrentWorkspace() != null
 				&& !Nd4j.getMemoryManager().getCurrentWorkspace().getId().equals(ComputationGraph.workspaceExternal)
-						? Nd4j.getWorkspaceManager().getWorkspaceForCurrentThread(
-								ComputationGraph.workspaceConfigurationLSTM, ComputationGraph.workspaceLSTM)
+						? Nd4j.getWorkspaceManager().getWorkspaceForCurrentThread(workspaceConfigurationGRU, "LOOP_GRU")
 						: null;
 
 		INDArray timeStepMaskColumn = null;
 		INDArray epsilonNext = Nd4j.create(new int[] { miniBatchSize, prevLayerSize, timeSeriesLength }, 'f');
+		IActivation afn = ((org.deeplearning4j.nn.conf.layers.BaseLayer) conf.getLayer()).getActivationFn();
 
 		for (int iTimeIndex = timeSeriesLength - 1; iTimeIndex >= endIdx; iTimeIndex--) {
 			if (workspace != null) {
@@ -326,7 +336,6 @@ public class GRUHelpers {
 
 			INDArray hz = fwdPass.hz[time];
 			INDArray deltah = dLdo.mul(ua);
-			IActivation afn = ((org.deeplearning4j.nn.conf.layers.BaseLayer) conf.getLayer()).getActivationFn();
 			deltah.assign(afn.backprop(hz.dup('f'), deltah).getFirst());
 
 			INDArray rz = fwdPass.rz[time];
