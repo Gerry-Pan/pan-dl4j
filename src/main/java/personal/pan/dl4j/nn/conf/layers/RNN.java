@@ -106,7 +106,7 @@ public class RNN extends BaseRecurrentLayer {
 
 		@SuppressWarnings("unchecked")
 		public RNN build() {
-			return new RNN();
+			return new RNN(this);
 		}
 	}
 }
