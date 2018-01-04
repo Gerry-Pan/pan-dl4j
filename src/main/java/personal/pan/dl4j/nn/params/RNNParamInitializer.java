@@ -32,6 +32,10 @@ public class RNNParamInitializer implements ParamInitializer {
 	public final static String BIAS_KEY = DefaultParamInitializer.BIAS_KEY;
 	public final static String INPUT_WEIGHT_KEY = DefaultParamInitializer.WEIGHT_KEY;
 
+	public static RNNParamInitializer getInstance() {
+		return INSTANCE;
+	}
+
 	@Override
 	public int numParams(NeuralNetConfiguration conf) {
 		return numParams(conf.getLayer());
@@ -87,7 +91,7 @@ public class RNNParamInitializer implements ParamInitializer {
 					dist, inputWeightView));
 			params.put(RECURRENT_WEIGHT_KEY, WeightInitUtil.initWeights(fanIn, fanOut, recurrentWShape,
 					layer.getWeightInit(), dist, recurrentWeightView));
-			biasView.put(new INDArrayIndex[] { NDArrayIndex.point(0), NDArrayIndex.interval(nL, 2 * nL) },
+			biasView.put(new INDArrayIndex[] { NDArrayIndex.point(0), NDArrayIndex.interval(0, nL) },
 					Nd4j.valueArrayOf(1, nL, 1));
 
 			params.put(BIAS_KEY, biasView);
