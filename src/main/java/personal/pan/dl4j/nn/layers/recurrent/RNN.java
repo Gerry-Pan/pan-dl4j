@@ -175,6 +175,11 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 
 			Nd4j.gemm(prevLayerActivationSlice, deltaNext, iwGradientsOut, true, false, 1.0, 1.0);
 
+			INDArray prevAct = iTimeIndex == 0 ? fwdPass.prevAct : fwdPass.fwdPassOutputAsArrays[time - inext];
+			if (iTimeIndex > 0 || prevAct != null) {
+				Nd4j.gemm(prevAct, deltaNext, rwGradientsOut, true, false, 1.0, 1.0);
+			}
+
 			l1BLAS.axpy(hiddenLayerSize, 1.0, deltaNext.sum(0), bGradientsOut);
 
 			INDArray epsilonNextSlice = epsilonNext.tensorAlongDimension(time, 1, 0);
