@@ -274,7 +274,7 @@ public class GRUHelpers {
 			int inext = 1;
 
 			/*
-			 * dLdo是损失函数对本层当前时刻输出值的偏导，故dLdo是损失函数对本层后一时刻输出值的偏导
+			 * dLdo是损失函数对本层当前时刻输出值的偏导，dLdo也是损失函数对本层后一时刻输入值的偏导
 			 * dLdo与GRUFwdPassReturn.fwdPassOutput有相同的shape，shape(batchSize,hiddenLayerSize)
 			 * epsilon是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
 			 * epsilonSlice为epsilon的时间切片，shape(batchSize,hiddenLayerSize)
