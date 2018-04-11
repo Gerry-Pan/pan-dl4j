@@ -11,7 +11,6 @@ import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
 import org.deeplearning4j.nn.gradient.DefaultGradient;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.deeplearning4j.util.Dropout;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.blas.Level1;
 import org.nd4j.linalg.api.memory.MemoryWorkspace;
@@ -87,7 +86,7 @@ public class GRUHelpers {
 
 			if (cacheMode != CacheMode.NONE) {
 				try (MemoryWorkspace ws = Nd4j.getWorkspaceManager()
-						.getWorkspaceForCurrentThread(ComputationGraph.workspaceCache).notifyScopeBorrowed()) {
+						.getWorkspaceForCurrentThread(ComputationGraph.WORKSPACE_CACHE).notifyScopeBorrowed()) {
 					outputActivations = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength },
 							'f');
 					toReturn.fwdPassOutput = outputActivations;
@@ -115,10 +114,6 @@ public class GRUHelpers {
 		INDArray biasesU = biases.get(NDArrayIndex.all(), NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
 		INDArray biasesH = biases.get(NDArrayIndex.all(),
 				NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
-
-		if (conf.isUseDropConnect() && training && conf.getLayer().getDropOut() > 0) {
-			inputWeights = Dropout.applyDropConnect(layer, inputWeightKey);
-		}
 
 		if (prevOutputActivations == null) {
 			prevOutputActivations = Nd4j.zeros(new int[] { miniBatchSize, hiddenLayerSize });
@@ -257,7 +252,7 @@ public class GRUHelpers {
 		INDArray dLdoNext = null;
 
 		MemoryWorkspace workspace = Nd4j.getMemoryManager().getCurrentWorkspace() != null
-				&& !Nd4j.getMemoryManager().getCurrentWorkspace().getId().equals(ComputationGraph.workspaceExternal)
+				&& !Nd4j.getMemoryManager().getCurrentWorkspace().getId().equals(ComputationGraph.WORKSPACE_EXTERNAL)
 						? Nd4j.getWorkspaceManager().getWorkspaceForCurrentThread(workspaceConfigurationGRU, "LOOP_GRU")
 						: null;
 
@@ -274,7 +269,7 @@ public class GRUHelpers {
 			int inext = 1;
 
 			/*
-			 * dLdo是损失函数对本层当前时刻输出值的偏导，dLdo也是损失函数对本层后一时刻输入值的偏导
+			 * dLdo是损失函数对本层当前时刻输出值的偏导，故dLdo也是损失函数对本层后一时刻输入值的偏导
 			 * dLdo与GRUFwdPassReturn.fwdPassOutput有相同的shape，shape(batchSize,hiddenLayerSize)
 			 * epsilon是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
 			 * epsilonSlice为epsilon的时间切片，shape(batchSize,hiddenLayerSize)
@@ -313,7 +308,7 @@ public class GRUHelpers {
 
 			temp.muli(raNext);
 			dLdo.addi(temp);
-			dLdoNext = dLdo;
+			dLdoNext = workspace == null ? dLdo : dLdo.leverage();
 
 			INDArray ha = null;
 			if (iTimeIndex != timeSeriesLength - 1) {

@@ -1,7 +1,9 @@
 package personal.pan.dl4j.nn.params;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.deeplearning4j.nn.api.ParamInitializer;
@@ -135,4 +137,28 @@ public class RNNParamInitializer implements ParamInitializer {
 		return out;
 	}
 
+	@Override
+	public List<String> paramKeys(Layer layer) {
+		return Arrays.asList(INPUT_WEIGHT_KEY, RECURRENT_WEIGHT_KEY, BIAS_KEY);
+	}
+
+	@Override
+	public List<String> weightKeys(Layer layer) {
+		return Arrays.asList(INPUT_WEIGHT_KEY, RECURRENT_WEIGHT_KEY);
+	}
+
+	@Override
+	public List<String> biasKeys(Layer layer) {
+		return Collections.singletonList(BIAS_KEY);
+	}
+
+	@Override
+	public boolean isWeightParam(Layer layer, String key) {
+		return RECURRENT_WEIGHT_KEY.equals(key) || INPUT_WEIGHT_KEY.equals(key);
+	}
+
+	@Override
+	public boolean isBiasParam(Layer layer, String key) {
+		return BIAS_KEY.equals(key);
+	}
 }

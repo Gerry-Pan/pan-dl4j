@@ -25,7 +25,7 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 	private static final long serialVersionUID = 1L;
 
 	public static final String STATE_KEY_PREV_ACTIVATION = "prevAct";
-	
+
 	protected GRUFwdPassReturn cachedFwdPass;
 
 	public GRU(NeuralNetConfiguration conf) {
@@ -55,7 +55,7 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		INDArray outAct = fwdPass.fwdPassOutput;
 
 		if (storeLastForTBPTT) {
-			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.workspaceTBPTT));
+			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.WORKSPACE_TBPTT));
 		}
 
 		return outAct;
@@ -66,11 +66,6 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		throw new UnsupportedOperationException(
 				"gradient() method for layerwise pretraining: not supported for GRU (pretraining not possible)"
 						+ layerId());
-	}
-
-	@Override
-	public Gradient calcGradient(Gradient layerError, INDArray activation) {
-		throw new UnsupportedOperationException("Not supported " + layerId());
 	}
 
 	@Override
@@ -92,7 +87,7 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 
 		if (truncatedBPTT) {
 			fwdPass = activateHelper(true, stateMap.get(STATE_KEY_PREV_ACTIVATION), true);
-			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.workspaceTBPTT));
+			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.WORKSPACE_TBPTT));
 		} else {
 			fwdPass = activateHelper(true, null, true);
 		}
@@ -135,22 +130,17 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		return activateHelper(false, null, false).fwdPassOutput;
 	}
 
-	@Override
-	public INDArray activationMean() {
-		return activate();
-	}
-
 	protected GRUFwdPassReturn activateHelper(final boolean training, final INDArray prevOutputActivations,
 			boolean forBackprop) {
 		if (cacheMode == null)
 			cacheMode = CacheMode.NONE;
 
 		if (forBackprop && cachedFwdPass != null) {
-            GRUFwdPassReturn ret = cachedFwdPass;
-            cachedFwdPass = null;
-            return ret;
-        }
-		
+			GRUFwdPassReturn ret = cachedFwdPass;
+			cachedFwdPass = null;
+			return ret;
+		}
+
 		final INDArray recurrentWeights = getParam(GRUParamInitializer.RECURRENT_WEIGHT_KEY);
 		final INDArray inputWeights = getParam(GRUParamInitializer.INPUT_WEIGHT_KEY);
 		final INDArray biases = getParam(GRUParamInitializer.BIAS_KEY);
@@ -161,9 +151,9 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 				maskArray, forBackprop ? cacheMode : CacheMode.NONE);
 
 		if (training && cacheMode != CacheMode.NONE) {
-            cachedFwdPass = fwd;
-        }
-		
+			cachedFwdPass = fwd;
+		}
+
 		return fwd;
 	}
 

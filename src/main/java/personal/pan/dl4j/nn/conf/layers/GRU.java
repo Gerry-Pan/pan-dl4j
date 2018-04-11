@@ -86,23 +86,6 @@ public class GRU extends BaseRecurrentLayer {
 	}
 
 	@Override
-	public double getLearningRateByParam(String paramName) {
-		switch (paramName) {
-		case GRUParamInitializer.INPUT_WEIGHT_KEY:
-		case GRUParamInitializer.RECURRENT_WEIGHT_KEY:
-			return learningRate;
-		case GRUParamInitializer.BIAS_KEY:
-			if (!Double.isNaN(biasLearningRate)) {
-				return biasLearningRate;
-			} else {
-				return learningRate;
-			}
-		default:
-			throw new IllegalArgumentException("Unknown parameter name: \"" + paramName + "\"");
-		}
-	}
-
-	@Override
 	public LayerMemoryReport getMemoryReport(InputType inputType) {
 		return GRUHelpers.getMemoryReport(this, inputType);
 	}

@@ -81,23 +81,6 @@ public class RNN extends BaseRecurrentLayer {
 	}
 
 	@Override
-	public double getLearningRateByParam(String paramName) {
-		switch (paramName) {
-		case RNNParamInitializer.INPUT_WEIGHT_KEY:
-		case RNNParamInitializer.RECURRENT_WEIGHT_KEY:
-			return learningRate;
-		case RNNParamInitializer.BIAS_KEY:
-			if (!Double.isNaN(biasLearningRate)) {
-				return biasLearningRate;
-			} else {
-				return learningRate;
-			}
-		default:
-			throw new IllegalArgumentException("Unknown parameter name: \"" + paramName + "\"");
-		}
-	}
-
-	@Override
 	public LayerMemoryReport getMemoryReport(InputType inputType) {
 		return null;
 	}

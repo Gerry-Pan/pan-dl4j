@@ -10,7 +10,6 @@ import org.deeplearning4j.nn.gradient.DefaultGradient;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.layers.recurrent.BaseRecurrentLayer;
-import org.deeplearning4j.util.Dropout;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.blas.Level1;
 import org.nd4j.linalg.api.memory.MemoryWorkspace;
@@ -61,7 +60,7 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 		INDArray outAct = fwdPass.fwdPassOutput;
 
 		if (storeLastForTBPTT) {
-			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.workspaceTBPTT));
+			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.WORKSPACE_TBPTT));
 		}
 
 		return outAct;
@@ -85,11 +84,6 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 	}
 
 	@Override
-	public Gradient calcGradient(Gradient layerError, INDArray activation) {
-		throw new UnsupportedOperationException("Not supported " + layerId());
-	}
-
-	@Override
 	public Pair<Gradient, INDArray> backpropGradient(INDArray epsilon) {
 		return backpropGradientHelper(epsilon, false, -1);
 	}
@@ -103,7 +97,7 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 
 		if (truncatedBPTT) {
 			fwdPass = activateHelper(true, stateMap.get(STATE_KEY_PREV_ACTIVATION), true);
-			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.workspaceTBPTT));
+			tBpttStateMap.put(STATE_KEY_PREV_ACTIVATION, fwdPass.lastAct.leverageTo(ComputationGraph.WORKSPACE_TBPTT));
 		} else {
 			fwdPass = activateHelper(true, null, true);
 		}
@@ -297,7 +291,7 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 
 			if (cacheMode != CacheMode.NONE) {
 				try (MemoryWorkspace ws = Nd4j.getWorkspaceManager()
-						.getWorkspaceForCurrentThread(ComputationGraph.workspaceCache).notifyScopeBorrowed()) {
+						.getWorkspaceForCurrentThread(ComputationGraph.WORKSPACE_CACHE).notifyScopeBorrowed()) {
 					outputActivations = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength },
 							'f');
 					toReturn.fwdPassOutput = outputActivations;
@@ -306,10 +300,6 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 		} else {
 			outputActivations = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f');
 			toReturn.fwdPassOutput = outputActivations;
-		}
-
-		if (conf.isUseDropConnect() && training && conf.getLayer().getDropOut() > 0) {
-			inputWeights = Dropout.applyDropConnect(layer, inputWeightKey);
 		}
 
 		if (prevOutputActivations == null) {

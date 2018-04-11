@@ -7,12 +7,6 @@
 	<version>0.1</version>
 	<packaging>jar</packaging>
 
-	<parent>
-		<groupId>org.deeplearning4j</groupId>
-		<artifactId>deeplearning4j-examples-parent</artifactId>
-		<version>0.9.1</version>
-	</parent>
-
 	<name>DeepLearning4j Examples</name>
 	<url>http://maven.apache.org</url>
 
@@ -20,6 +14,9 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<java.version>1.8</java.version>
+		<nd4j.version>1.0.0-alpha</nd4j.version>
+		<dl4j.version>1.0.0-alpha</dl4j.version>
+		<nd4j.backend>nd4j-native-platform</nd4j.backend>
 	</properties>
 
 	<dependencyManagement>
