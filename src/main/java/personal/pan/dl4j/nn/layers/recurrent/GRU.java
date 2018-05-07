@@ -1,6 +1,7 @@
 package personal.pan.dl4j.nn.layers.recurrent;
 
 import org.deeplearning4j.nn.api.Layer;
+import org.deeplearning4j.nn.api.MaskState;
 import org.deeplearning4j.nn.conf.CacheMode;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.gradient.Gradient;
@@ -155,6 +156,12 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		}
 
 		return fwd;
+	}
+
+	@Override
+	public Pair<INDArray, MaskState> feedForwardMaskArray(INDArray maskArray, MaskState currentMaskState,
+			int minibatchSize) {
+		return new Pair<>(maskArray, MaskState.Passthrough);
 	}
 
 	@Override
