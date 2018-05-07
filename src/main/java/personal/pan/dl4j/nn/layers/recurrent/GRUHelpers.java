@@ -158,6 +158,11 @@ public class GRUHelpers {
 			currentOutputActivations.muli(prevOutputActivations);
 			currentOutputActivations.addi(ua.mul(ha));
 
+			if (maskArray != null) {
+				INDArray timeStepMaskColumn = maskArray.getColumn(time);
+				currentOutputActivations.muliColumnVector(timeStepMaskColumn);
+			}
+
 			if (forBackprop) {
 				toReturn.fwdPassOutputAsArrays[time] = currentOutputActivations;
 
