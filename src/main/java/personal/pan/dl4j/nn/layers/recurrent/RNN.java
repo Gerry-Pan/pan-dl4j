@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.deeplearning4j.exception.DL4JInvalidInputException;
+import org.deeplearning4j.nn.api.MaskState;
 import org.deeplearning4j.nn.conf.CacheMode;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.gradient.DefaultGradient;
@@ -336,5 +337,11 @@ public class RNN extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.RNN
 		toReturn.prevAct = originalPrevOutputActivations;
 
 		return toReturn;
+	}
+
+	@Override
+	public Pair<INDArray, MaskState> feedForwardMaskArray(INDArray maskArray, MaskState currentMaskState,
+			int minibatchSize) {
+		return new Pair<>(maskArray, MaskState.Passthrough);
 	}
 }
