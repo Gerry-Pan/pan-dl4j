@@ -23,6 +23,10 @@ public class CosineOutputLayer extends BaseOutputLayer {
 	 */
 	private static final long serialVersionUID = 1L;
 
+	protected CosineOutputLayer() {
+		super();
+	}
+	
 	protected CosineOutputLayer(Builder builder) {
 		super(builder);
 	}
@@ -49,6 +53,10 @@ public class CosineOutputLayer extends BaseOutputLayer {
 
 	@NoArgsConstructor
 	public static class Builder extends BaseOutputLayer.Builder<Builder> {
+
+		public Builder() {
+
+		}
 
 		public Builder(LossFunction lossFunction) {
 			super.lossFunction(lossFunction);

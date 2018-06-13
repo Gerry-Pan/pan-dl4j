@@ -66,7 +66,7 @@ public class ActivationSiamese extends BaseActivationFunction {
 		BooleanIndexing.replaceWhere(outputNegative, 0, Conditions.greaterThanOrEqual(threshold));
 		BooleanIndexing.replaceWhere(outputNegative, in.mul(in), Conditions.notEquals(0));
 
-		INDArray output = Nd4j.create(in.shape());
+		INDArray output = Nd4j.create(in.rows(), in.columns() + 1);
 
 		output.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(0) }, outputNegative);
 		output.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(1) }, outputPositive);

@@ -2,9 +2,15 @@ package personal.pan.dl4j.nn.lossfunctions;
 
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.indexing.BooleanIndexing;
+import org.nd4j.linalg.indexing.INDArrayIndex;
+import org.nd4j.linalg.indexing.NDArrayIndex;
+import org.nd4j.linalg.indexing.conditions.Conditions;
 import org.nd4j.linalg.lossfunctions.LossUtil;
 import org.nd4j.linalg.lossfunctions.impl.LossMCXENT;
 
+import personal.pan.dl4j.nn.activations.ActivationCosine;
 import personal.pan.dl4j.nn.activations.ActivationSiamese;
 
 /**
@@ -15,17 +21,26 @@ import personal.pan.dl4j.nn.activations.ActivationSiamese;
  */
 public class LossSiamese extends LossMCXENT {
 
+	private final double threshold;
+
+	public LossSiamese(double threshold) {
+		this.threshold = threshold;
+	}
+
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * for (int i = 0; i < row; i++) {<br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;double ew = output.getDouble(i, 0);<br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;yhatNegative.putScalar(i, 0, ew < threshold ? ew * ew
-	 * : 0);<br>
-	 * }<br>
+	 * preOutput=[X1,X2]<br>
+	 * output=cosine(preOutput)<br>
+	 * if output < threshold,l=[output^2,(1-output)^2/4] <br>
+	 * if output > threshold,l=[0,(1-output)^2/4]<br>
+	 * l=[L−(X1,X2),L+(X1,X2)]<br>
+	 * labels=[1-y,y]<br>
+	 * L=Lw(X1,X2)=(1−y)L−(X1,X2)+yL+(X1,X2)<br>
+	 * L=l.mul(labels)<br>
 	 * 
 	 * @param labels
 	 *            shape(batchSize,2)
@@ -37,20 +52,26 @@ public class LossSiamese extends LossMCXENT {
 	 * @return
 	 */
 	private INDArray scoreArray(INDArray labels, INDArray preOutput, IActivation activationFn, INDArray mask) {
-		if (labels.size(1) != (preOutput.size(1) + 1)) {
-			throw new IllegalArgumentException("Labels array numColumns (size(1) = " + String.valueOf(labels.size(1))
-					+ ") does not match output layer" + " number of outputs (nOut = "
-					+ String.valueOf(preOutput.size(1) + 1) + ") ");
-
-		}
-
-		if (!(activationFn instanceof ActivationSiamese)) {
+		if (!(activationFn instanceof ActivationCosine)) {
 			throw new RuntimeException("activation function must be ActivationSiamese.");
 		}
 
-		INDArray output = activationFn.getActivation(preOutput.dup(), true);
+		INDArray output = activationFn.getActivation(preOutput, true);
 
-		INDArray scoreArr = output.mul(labels);
+		INDArray outputPositive = output.rsub(1).div(2);
+		outputPositive.muli(outputPositive);
+
+		INDArray outputNegative = output.dup(output.ordering());
+
+		BooleanIndexing.replaceWhere(outputNegative, 0, Conditions.greaterThanOrEqual(threshold));
+		BooleanIndexing.replaceWhere(outputNegative, output.mul(output), Conditions.notEquals(0));
+
+		INDArray l = Nd4j.create(labels.shape());
+
+		l.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(0) }, outputNegative);
+		l.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(1) }, outputPositive);
+
+		INDArray scoreArr = l.mul(labels);
 
 		if (mask != null) {
 			LossUtil.applyMask(scoreArr, mask);
@@ -79,20 +100,41 @@ public class LossSiamese extends LossMCXENT {
 		return scoreArr.sum(1);
 	}
 
-	/*
-	 * @param preOutput
-	 *            shape(batchSize,1)&nbsp;&nbsp;&nbsp;&nbsp;此参数为链接中的Ew,即cosine值
-	 */
 	@Override
 	public INDArray computeGradient(INDArray labels, INDArray preOutput, IActivation activationFn, INDArray mask) {
 
-		if (!(activationFn instanceof ActivationSiamese)) {
+		if (!(activationFn instanceof ActivationCosine)) {
 			throw new RuntimeException("activation function must be ActivationSiamese.");
 		}
 
-		INDArray dLda = labels.dup();
-		INDArray gradients = activationFn.backprop(preOutput, dLda).getFirst();
+		INDArray dLdl = labels.dup();
 
-		return gradients;
+		int row = dLdl.rows();
+		INDArray dLda = Nd4j.create(row, 1);
+
+		INDArray output = activationFn.getActivation(preOutput, true);
+
+		INDArray derivativeNegative = output.dup(output.ordering());
+
+		BooleanIndexing.replaceWhere(derivativeNegative, 0, Conditions.greaterThanOrEqual(threshold));
+		BooleanIndexing.replaceWhere(derivativeNegative, output.mul(2), Conditions.notEquals(0));
+
+		INDArray derivativePositive = output.rsub(1).div(2);
+
+		INDArray derivative = Nd4j.create(output.rows(), output.columns() + 1);
+
+		derivative.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(0) }, derivativeNegative);
+		derivative.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(1) }, derivativePositive);
+
+		for (int i = 0; i < row; i++) {
+			INDArray v1 = derivative.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() });
+			INDArray v2 = dLdl.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() });
+
+			dLda.put(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() }, v1.mmul(v2.transpose()));
+		}
+
+		INDArray dLdoutput = activationFn.backprop(preOutput, dLda).getFirst();
+
+		return dLdoutput;
 	}
 }
