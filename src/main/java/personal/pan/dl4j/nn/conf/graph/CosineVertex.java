@@ -1,4 +1,4 @@
-package personal.pan.dl4j.nn.conf.layers.graph;
+package personal.pan.dl4j.nn.conf.graph;
 
 import org.deeplearning4j.nn.conf.graph.GraphVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
