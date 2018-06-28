@@ -93,6 +93,9 @@ public class CosineVertex extends BaseGraphVertex {
 
 		x2EpsilonNext.diviColumnVector(x1L2norm);
 		x2EpsilonNext.diviColumnVector(x2L2norm.mul(x2L2normSq));
+		
+		x1EpsilonNext.muliColumnVector(epsilon);
+		x2EpsilonNext.muliColumnVector(epsilon);
 
 		INDArray[] epsilonNext = new INDArray[] { x1EpsilonNext, x2EpsilonNext };
 

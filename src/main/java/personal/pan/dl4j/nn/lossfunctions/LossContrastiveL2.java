@@ -10,14 +10,13 @@ import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.Op;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.indexing.BooleanIndexing;
 import org.nd4j.linalg.indexing.INDArrayIndex;
 import org.nd4j.linalg.indexing.NDArrayIndex;
-import org.nd4j.linalg.indexing.conditions.Conditions;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossUtil;
 import org.nd4j.linalg.lossfunctions.serde.RowVectorDeserializer;
 import org.nd4j.linalg.lossfunctions.serde.RowVectorSerializer;
+import org.nd4j.linalg.ops.transforms.Transforms;
 import org.nd4j.linalg.primitives.Pair;
 import org.nd4j.shade.jackson.databind.annotation.JsonDeserialize;
 import org.nd4j.shade.jackson.databind.annotation.JsonSerialize;
@@ -26,17 +25,9 @@ import org.tensorflow.framework.GraphDef;
 import org.tensorflow.framework.NodeDef;
 
 import onnx.OnnxProto3;
-import personal.pan.dl4j.nn.activations.ActivationCosine;
-import personal.pan.dl4j.nn.activations.ActivationExp;
 import personal.pan.dl4j.nn.activations.ActivationSiamese;
 
-/**
- * https://blog.csdn.net/thriving_fcl/article/details/73730552
- * 
- * @author Jerry
- *
- */
-public class LossSiamese extends DifferentialFunction implements ILossFunction {
+public class LossContrastiveL2 extends DifferentialFunction implements ILossFunction {
 
 	/**
 	 * 
@@ -49,11 +40,11 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 	@JsonDeserialize(using = RowVectorDeserializer.class)
 	protected final INDArray weights;
 
-	public LossSiamese(double margin) {
+	public LossContrastiveL2(double margin) {
 		this(margin, null);
 	}
 
-	public LossSiamese(double margin, INDArray weights) {
+	public LossContrastiveL2(double margin, INDArray weights) {
 		this.margin = margin;
 		this.weights = weights;
 	}
@@ -61,8 +52,8 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 	/**
 	 * preOutput=[X1,X2]<br>
 	 * output=cosine(preOutput)<br>
-	 * if output < margin,l=[output^2,(1-output)^2/4] <br>
-	 * if output > margin,l=[0,(1-output)^2/4]<br>
+	 * if output < margin,l=[(margin-output)^2,output^2] <br>
+	 * if output > margin,l=[0,output^2]<br>
 	 * l=[L−(X1,X2),L+(X1,X2)]<br>
 	 * labels=[1-y,y]<br>
 	 * L=Lw(X1,X2)=(1−y)L−(X1,X2)+yL+(X1,X2)<br>
@@ -78,19 +69,10 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 	 * @return
 	 */
 	private INDArray scoreArray(INDArray labels, INDArray preOutput, IActivation activationFn, INDArray mask) {
-		if (!(activationFn instanceof ActivationCosine) && !(activationFn instanceof ActivationExp)) {
-			throw new RuntimeException("activation function must be ActivationCosine or ActivationExp.");
-		}
-
 		INDArray output = activationFn.getActivation(preOutput, true);
 
-		INDArray outputPositive = output.rsub(1).div(2);
-		outputPositive.muli(outputPositive);
-
-		INDArray outputNegative = output.dup(output.ordering());
-
-		BooleanIndexing.replaceWhere(outputNegative, 0, Conditions.greaterThanOrEqual(margin));
-		BooleanIndexing.replaceWhere(outputNegative, output.mul(output), Conditions.notEquals(0));
+		INDArray outputPositive = output.mul(output).mul(2 / margin);
+		INDArray outputNegative = Transforms.exp(output.mul(-2.77 / margin), true).mul(2 * margin);
 
 		INDArray l = Nd4j.create(labels.shape());
 
@@ -128,36 +110,16 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 
 	@Override
 	public INDArray computeGradient(INDArray labels, INDArray preOutput, IActivation activationFn, INDArray mask) {
-
-		if (!(activationFn instanceof ActivationCosine) && !(activationFn instanceof ActivationExp)) {
-			throw new RuntimeException("activation function must be ActivationCosine or ActivationExp.");
-		}
-
 		INDArray dLdl = labels.dup();
-
-		int row = dLdl.rows();
-		INDArray dLda = Nd4j.create(row, 1);
 
 		INDArray output = activationFn.getActivation(preOutput, true);
 
-		INDArray derivativeNegative = output.dup(output.ordering());
+		INDArray derivativeNegative = output.mul(4 / margin);
+		INDArray derivativePositive = Transforms.exp(output.mul(-2.77 / margin), true).mul(-2 * 2.77);
 
-		BooleanIndexing.replaceWhere(derivativeNegative, 0, Conditions.greaterThanOrEqual(margin));
-		BooleanIndexing.replaceWhere(derivativeNegative, output.mul(2), Conditions.notEquals(0));
+		INDArray derivative = Nd4j.hstack(derivativeNegative, derivativePositive);
 
-		INDArray derivativePositive = output.rsub(1).div(2);
-
-		INDArray derivative = Nd4j.create(output.rows(), output.columns() + 1);
-
-		derivative.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(0) }, derivativeNegative);
-		derivative.put(new INDArrayIndex[] { NDArrayIndex.all(), NDArrayIndex.point(1) }, derivativePositive);
-
-		for (int i = 0; i < row; i++) {
-			INDArray v1 = derivative.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() });
-			INDArray v2 = dLdl.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() });
-
-			dLda.put(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all() }, v1.mmul(v2.transpose()));
-		}
+		INDArray dLda = derivative.mul(dLdl).sum(1);
 
 		INDArray dLdoutput = activationFn.backprop(preOutput, dLda).getFirst();
 
@@ -184,8 +146,8 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 	@Override
 	public String toString() {
 		if (weights == null)
-			return "LossSiamese()";
-		return "LossSiamese(weights=" + weights + ")";
+			return "LossContrastiveL2()";
+		return "LossContrastiveL2(weights=" + weights + ")";
 	}
 
 	@Override
@@ -227,11 +189,12 @@ public class LossSiamese extends DifferentialFunction implements ILossFunction {
 
 	@Override
 	public String onnxName() {
-		return "SiameseLoss";
+		return "ContrastiveL2Loss";
 	}
 
 	@Override
 	public String tensorflowName() {
-		return "SiameseLoss";
+		return "ContrastiveL2Loss";
 	}
+
 }
