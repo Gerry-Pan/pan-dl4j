@@ -82,14 +82,14 @@ public class AttentionVertex extends BaseGraphVertex {
 			int secondLastIdx = (int) secondLastElementIdx.getDouble(i);
 
 			INDArray q = x1.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, firstLastIdx) });
+					NDArrayIndex.interval(0, firstLastIdx + 1) });
 			INDArray k = x2.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, secondLastIdx) });
+					NDArrayIndex.interval(0, secondLastIdx + 1) });
 
 			INDArray r = attention(q, k);
 
 			result.put(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, secondLastIdx) }, r);
+					NDArrayIndex.interval(0, secondLastIdx + 1) }, r);
 		}
 
 		return result;
@@ -128,16 +128,16 @@ public class AttentionVertex extends BaseGraphVertex {
 			int secondLastIdx = (int) secondLastElementIdx.getDouble(i);
 
 			INDArray q = x1.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, firstLastIdx) });
+					NDArrayIndex.interval(0, firstLastIdx + 1) });
 			INDArray k = x2.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, secondLastIdx) });
+					NDArrayIndex.interval(0, secondLastIdx + 1) });
 
 			INDArray alpha = k.transpose().mmul(q).div(Math.sqrt(dk));
 			INDArray softMax = Transforms.softmax(alpha);
 			INDArray softMaxDerivative = Nd4j.getExecutioner().exec(new SoftMaxDerivative(alpha)).z();
 
 			INDArray e = epsilon.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, secondLastIdx) });
+					NDArrayIndex.interval(0, secondLastIdx + 1) });
 
 			INDArray temp = q.transpose().mmul(e).mul(softMaxDerivative.transpose());
 
@@ -147,9 +147,9 @@ public class AttentionVertex extends BaseGraphVertex {
 			Nd4j.gemm(e, softMax, dLdq, false, false, 1.0, 0.0);
 
 			x1EpsilonNext.put(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, firstLastIdx) }, dLdq);
+					NDArrayIndex.interval(0, firstLastIdx + 1) }, dLdq);
 			x2EpsilonNext.put(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
-					NDArrayIndex.interval(0, secondLastIdx) }, dLdk);
+					NDArrayIndex.interval(0, secondLastIdx + 1) }, dLdk);
 		}
 
 		INDArray[] epsilonNext = new INDArray[] { x1EpsilonNext, x2EpsilonNext };
