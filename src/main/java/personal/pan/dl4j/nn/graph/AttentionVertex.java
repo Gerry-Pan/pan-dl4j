@@ -6,6 +6,8 @@ import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.graph.vertex.BaseGraphVertex;
 import org.deeplearning4j.nn.graph.vertex.VertexIndices;
+import org.deeplearning4j.nn.workspace.ArrayType;
+import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.impl.transforms.Or;
 import org.nd4j.linalg.api.ops.impl.transforms.SoftMaxDerivative;
@@ -47,7 +49,7 @@ public class AttentionVertex extends BaseGraphVertex {
 	}
 
 	@Override
-	public INDArray doForward(boolean training) {
+	public INDArray doForward(boolean training, LayerWorkspaceMgr workspaceMgr) {
 		if (!canDoForward())
 			throw new IllegalStateException("Cannot do forward pass: inputs not set");
 
@@ -59,9 +61,9 @@ public class AttentionVertex extends BaseGraphVertex {
 		INDArray x1 = inputs[0];
 		INDArray x2 = inputs[1];
 
-		int[] fwdPassShape = x1.shape();
-		int batchSize = fwdPassShape[0];
-		int maxTsLength = fwdPassShape[2];
+		long[] fwdPassShape = x1.shape();
+		int batchSize = (int) fwdPassShape[0];
+		int maxTsLength = (int) fwdPassShape[2];
 
 		INDArray[] inputMaskArrays = graph.getInputMaskArrays();
 		INDArray firstMask = inputMaskArrays[0];
@@ -75,7 +77,7 @@ public class AttentionVertex extends BaseGraphVertex {
 		INDArray firstLastElementIdx = Nd4j.argMax(firstMaskArray, 1);
 		INDArray secondLastElementIdx = Nd4j.argMax(secondMaskArray, 1);
 
-		INDArray result = Nd4j.create(fwdPassShape);
+		INDArray result = workspaceMgr.create(ArrayType.ACTIVATIONS, fwdPassShape);
 
 		for (int i = 0; i < batchSize; i++) {
 			int firstLastIdx = (int) firstLastElementIdx.getDouble(i);
@@ -96,17 +98,17 @@ public class AttentionVertex extends BaseGraphVertex {
 	}
 
 	@Override
-	public Pair<Gradient, INDArray[]> doBackward(boolean tbptt) {
+	public Pair<Gradient, INDArray[]> doBackward(boolean tbptt, LayerWorkspaceMgr workspaceMgr) {
 		if (!canDoBackward())
 			throw new IllegalStateException("Cannot do backward pass: errors not set");
 
 		INDArray x1 = inputs[0];
 		INDArray x2 = inputs[1];
 
-		int[] fwdPassShape = x1.shape();
-		int dk = fwdPassShape[1];
-		int batchSize = fwdPassShape[0];
-		int maxTsLength = fwdPassShape[2];
+		long[] fwdPassShape = x1.shape();
+		int dk = (int) fwdPassShape[1];
+		int batchSize = (int) fwdPassShape[0];
+		int maxTsLength = (int) fwdPassShape[2];
 
 		INDArray[] inputMaskArrays = graph.getInputMaskArrays();
 		INDArray firstMask = inputMaskArrays[0];
@@ -120,8 +122,8 @@ public class AttentionVertex extends BaseGraphVertex {
 		INDArray firstLastElementIdx = Nd4j.argMax(firstMaskArray, 1);
 		INDArray secondLastElementIdx = Nd4j.argMax(secondMaskArray, 1);
 
-		INDArray x1EpsilonNext = Nd4j.create(x1.shape());
-		INDArray x2EpsilonNext = Nd4j.create(x2.shape());
+		INDArray x1EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, x1.shape());
+		INDArray x2EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, x2.shape());
 
 		for (int i = 0; i < batchSize; i++) {
 			int firstLastIdx = (int) firstLastElementIdx.getDouble(i);

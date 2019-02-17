@@ -10,15 +10,11 @@ import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
 import org.deeplearning4j.nn.gradient.DefaultGradient;
 import org.deeplearning4j.nn.gradient.Gradient;
-import org.deeplearning4j.nn.graph.ComputationGraph;
+import org.deeplearning4j.nn.workspace.ArrayType;
+import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.blas.Level1;
 import org.nd4j.linalg.api.memory.MemoryWorkspace;
-import org.nd4j.linalg.api.memory.conf.WorkspaceConfiguration;
-import org.nd4j.linalg.api.memory.enums.AllocationPolicy;
-import org.nd4j.linalg.api.memory.enums.LearningPolicy;
-import org.nd4j.linalg.api.memory.enums.ResetPolicy;
-import org.nd4j.linalg.api.memory.enums.SpillPolicy;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.impl.transforms.TimesOneMinus;
 import org.nd4j.linalg.api.shape.Shape;
@@ -34,16 +30,11 @@ import org.nd4j.linalg.primitives.Pair;
  */
 public class GRUHelpers {
 
-	public final static WorkspaceConfiguration workspaceConfigurationGRU = WorkspaceConfiguration.builder()
-			.initialSize(0).overallocationLimit(0.2).policyReset(ResetPolicy.BLOCK_LEFT)
-			.policyAllocation(AllocationPolicy.OVERALLOCATE).policySpill(SpillPolicy.REALLOCATE)
-			.policyLearning(LearningPolicy.FIRST_LOOP).build();
-
 	public static GRUFwdPassReturn activateHelper(final GRU layer, final NeuralNetConfiguration conf,
 			final IActivation gateActivationFn, final INDArray input, final INDArray recurrentWeights,
 			final INDArray originalInputWeights, final INDArray biases, final boolean training,
 			final INDArray originalPrevOutputActivations, boolean forBackprop, final String inputWeightKey,
-			INDArray maskArray, final CacheMode cacheMode) {
+			INDArray maskArray, final CacheMode cacheMode, final LayerWorkspaceMgr workspaceMgr) {
 
 		if (input == null || input.length() == 0) {
 			throw new IllegalArgumentException("Invalid input: not set or 0 length");
@@ -55,9 +46,9 @@ public class GRUHelpers {
 		INDArray prevOutputActivations = originalPrevOutputActivations;
 
 		boolean is2dInput = input.rank() < 3;
-		int timeSeriesLength = (is2dInput ? 1 : input.size(2));
-		int hiddenLayerSize = recurrentWeights.size(0);
-		int miniBatchSize = input.size(0);
+		int timeSeriesLength = (int) (is2dInput ? 1 : input.size(2));
+		int hiddenLayerSize = (int) recurrentWeights.size(0);
+		int miniBatchSize = (int) input.size(0);
 
 		if (input.size(1) != inputWeights.size(0)) {
 			throw new DL4JInvalidInputException("Received input with size(1) = " + input.size(1)
@@ -84,16 +75,22 @@ public class GRUHelpers {
 			toReturn.hz = new INDArray[timeSeriesLength];
 			toReturn.ha = new INDArray[timeSeriesLength];
 
-			if (cacheMode != CacheMode.NONE) {
-				try (MemoryWorkspace ws = Nd4j.getWorkspaceManager()
-						.getWorkspaceForCurrentThread(ComputationGraph.WORKSPACE_CACHE).notifyScopeBorrowed()) {
-					outputActivations = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength },
+			if (training && cacheMode != CacheMode.NONE && workspaceMgr.hasConfiguration(ArrayType.FF_CACHE)
+					&& workspaceMgr.isWorkspaceOpen(ArrayType.FF_CACHE)) {
+				try (MemoryWorkspace wsB = workspaceMgr.notifyScopeBorrowed(ArrayType.FF_CACHE)) {
+					outputActivations = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize, timeSeriesLength },
 							'f');
 					toReturn.fwdPassOutput = outputActivations;
 				}
+			} else {
+				outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS,
+						new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f'); // F order to keep time
+																								// steps together
+				toReturn.fwdPassOutput = outputActivations;
 			}
 		} else {
-			outputActivations = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f');
+			outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS,
+					new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f');
 			toReturn.fwdPassOutput = outputActivations;
 		}
 
@@ -116,7 +113,7 @@ public class GRUHelpers {
 				NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
 
 		if (prevOutputActivations == null) {
-			prevOutputActivations = Nd4j.zeros(new int[] { miniBatchSize, hiddenLayerSize });
+			prevOutputActivations = Nd4j.zeros(new long[] { miniBatchSize, hiddenLayerSize });
 		}
 
 		for (int iTimeIndex = 0; iTimeIndex < timeSeriesLength; iTimeIndex++) {
@@ -210,13 +207,13 @@ public class GRUHelpers {
 			final INDArray inputWeights, final INDArray epsilon, final boolean truncatedBPTT,
 			final int tbpttBackwardLength, final GRUFwdPassReturn fwdPass, final String inputWeightKey,
 			final String recurrentWeightKey, final String biasWeightKey, final Map<String, INDArray> gradientViews,
-			INDArray maskArray) {
+			INDArray maskArray, final LayerWorkspaceMgr workspaceMgr) {
 
-		int miniBatchSize = epsilon.size(0);
+		long miniBatchSize = epsilon.size(0);
 		boolean is2dInput = epsilon.rank() < 3;
-		int prevLayerSize = inputWeights.size(0);// prevLayerSize=nLast
-		int hiddenLayerSize = recurrentWeights.size(0);
-		int timeSeriesLength = (is2dInput ? 1 : epsilon.size(2));
+		long prevLayerSize = inputWeights.size(0);// prevLayerSize=nLast
+		long hiddenLayerSize = recurrentWeights.size(0);
+		long timeSeriesLength = (is2dInput ? 1 : epsilon.size(2));
 
 		Level1 l1BLAS = Nd4j.getBlasWrapper().level1();
 
@@ -241,14 +238,14 @@ public class GRUHelpers {
 		/*
 		 * deltarNext|deltauNext|deltahNext,shape(batchSize,hiddenLayerSize)
 		 */
-		INDArray deltaruhNext = Nd4j.create(new int[] { miniBatchSize, 3 * hiddenLayerSize }, 'f');
+		INDArray deltaruhNext = Nd4j.create(new long[] { miniBatchSize, 3 * hiddenLayerSize }, 'f');
 		INDArray deltarNext = deltaruhNext.get(NDArrayIndex.all(), NDArrayIndex.interval(0, hiddenLayerSize));
 		INDArray deltauNext = deltaruhNext.get(NDArrayIndex.all(),
 				NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
 		INDArray deltahNext = deltaruhNext.get(NDArrayIndex.all(),
 				NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
 
-		int endIdx = 0;
+		long endIdx = 0;
 
 		if (truncatedBPTT) {
 			endIdx = Math.max(0, timeSeriesLength - tbpttBackwardLength);
@@ -256,181 +253,171 @@ public class GRUHelpers {
 
 		INDArray dLdoNext = null;
 
-		MemoryWorkspace workspace = Nd4j.getMemoryManager().getCurrentWorkspace() != null
-				&& !Nd4j.getMemoryManager().getCurrentWorkspace().getId().equals(ComputationGraph.WORKSPACE_EXTERNAL)
-						? Nd4j.getWorkspaceManager().getWorkspaceForCurrentThread(workspaceConfigurationGRU, "LOOP_GRU")
-						: null;
-
 		INDArray timeStepMaskColumn = null;
-		INDArray epsilonNext = Nd4j.create(new int[] { miniBatchSize, prevLayerSize, timeSeriesLength }, 'f');
+		INDArray epsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD,
+				new long[] { miniBatchSize, prevLayerSize, timeSeriesLength }, 'f');
 		IActivation afn = ((org.deeplearning4j.nn.conf.layers.BaseLayer) conf.getLayer()).getActivationFn();
 
-		for (int iTimeIndex = timeSeriesLength - 1; iTimeIndex >= endIdx; iTimeIndex--) {
-			if (workspace != null) {
-				workspace.notifyScopeEntered();
-			}
-
-			int time = iTimeIndex;
-			int inext = 1;
-
-			/*
-			 * dLdo是损失函数对本层当前时刻输出值的偏导，故dLdo也是损失函数对本层后一时刻输入值的偏导
-			 * dLdo与GRUFwdPassReturn.fwdPassOutput有相同的shape，shape(batchSize,hiddenLayerSize)
-			 * epsilon是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
-			 * epsilonSlice为epsilon的时间切片，shape(batchSize,hiddenLayerSize)
-			 */
-			INDArray dLdo = null;
-			INDArray epsilonSlice = (is2dInput ? epsilon : epsilon.tensorAlongDimension(time, 1, 0));
-
-			if (iTimeIndex != timeSeriesLength - 1) {
-				INDArray uaNext = fwdPass.ua[time + 1];
-				dLdo = uaNext.mul(-1);
-				dLdo.addi(1);
-				dLdo.muli(dLdoNext);
-			} else {
-				dLdo = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize }, 'f');
-			}
-
-			dLdo.addi(Shape.toOffsetZeroCopy(epsilonSlice, 'f'));
-
-			INDArray raNext = null;// shape(batchSize,hiddenLayerSize)
-
-			if (iTimeIndex != timeSeriesLength - 1) {
-				raNext = fwdPass.ra[time + 1];
-			} else {
-				raNext = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize }, 'f');
-			}
-
-			INDArray temp = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize }, 'f');
-
-			/*
-			 * (batchSize,hiddenLayerSize) * (hiddenLayerSize,hiddenLayerSize)^T =
-			 * (batchSize,hiddenLayerSize)
-			 */
-			Nd4j.gemm(deltarNext, recurrentWeightsR, dLdo, false, true, 1.0, 1.0);
-			Nd4j.gemm(deltauNext, recurrentWeightsU, dLdo, false, true, 1.0, 1.0);
-			Nd4j.gemm(deltahNext, recurrentWeightsH, temp, false, true, 1.0, 1.0);
-
-			temp.muli(raNext);
-			dLdo.addi(temp);
-			dLdoNext = workspace == null ? dLdo : dLdo.leverage();
-
-			INDArray ha = null;
-			if (iTimeIndex != timeSeriesLength - 1) {
-				ha = fwdPass.ha[time];
-			} else {
-				ha = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize }, 'f');
-			}
-
-			INDArray uz = fwdPass.uz[time];
-			INDArray ua = fwdPass.ua[time];
-			INDArray prevAct = iTimeIndex == 0 ? fwdPass.prevAct : fwdPass.fwdPassOutputAsArrays[time - inext];// shape(batchSize,hiddenLayerSize)
-
-			INDArray deltau = dLdo.dup('f');
-			if (iTimeIndex > 0 || prevAct != null) {
-				deltau.muli(ha.sub(prevAct));
-			} else {
-				deltau.muli(ha);
-			}
-			deltau.assign(gateActivationFn.backprop(uz.dup('f'), deltau).getFirst());
-
-			INDArray hz = fwdPass.hz[time];
-			INDArray deltah = dLdo.mul(ua);
-			deltah.assign(afn.backprop(hz.dup('f'), deltah).getFirst());
-
-			INDArray rz = fwdPass.rz[time];
-			INDArray ra = fwdPass.ra[time];
-			temp = Nd4j.getExecutioner().execAndReturn(new TimesOneMinus(ra.dup('f')));
-			INDArray deltar = Nd4j.create(new int[] { miniBatchSize, hiddenLayerSize }, 'f');
-
-			if (prevAct != null) {
-				Nd4j.gemm(deltah, recurrentWeightsH, deltar, false, true, 1.0, 1.0);
-				deltar.muli(prevAct);
-				deltar.assign(gateActivationFn.backprop(rz.dup('f'), deltar).getFirst());
-			}
-
-			deltarNext.assign(deltar);
-			deltauNext.assign(deltau);
-			deltahNext.assign(deltah);
-
-			if (maskArray != null) {
-				timeStepMaskColumn = maskArray.getColumn(time);
-				deltaruhNext.muliColumnVector(timeStepMaskColumn);
-			}
-
-			INDArray prevLayerActivationSlice = Shape
-					.toMmulCompatible(is2dInput ? input : input.tensorAlongDimension(time, 1, 0));
-
-			if (iTimeIndex > 0 || prevAct != null) {
-				Nd4j.gemm(prevLayerActivationSlice, deltaruhNext, iwGradientsOut, true, false, 1.0, 1.0);
-			} else {
-				INDArray iwGradientsOutU = iwGradientsOut.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
-				INDArray iwGradientsOutH = iwGradientsOut.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
-
-				Nd4j.gemm(prevLayerActivationSlice, deltauNext, iwGradientsOutU, true, false, 1.0, 1.0);
-				Nd4j.gemm(prevLayerActivationSlice, deltahNext, iwGradientsOutH, true, false, 1.0, 1.0);
-			}
-
-			if (iTimeIndex > 0 || prevAct != null) {
+		for (long iTimeIndex = timeSeriesLength - 1; iTimeIndex >= endIdx; iTimeIndex--) {
+			try (MemoryWorkspace ws = workspaceMgr.notifyScopeEntered(ArrayType.RNN_BP_LOOP_WORKING_MEM)) {
+				int time = (int) iTimeIndex;
+				int inext = 1;
 
 				/*
-				 * rwGradientsOutR|rwGradientsOutU|rwGradientsOutH
-				 * shape(hiddenLayerSize,hiddenLayerSize)
+				 * dLdo是损失函数对本层当前时刻输出值的偏导，故dLdo也是损失函数对本层后一时刻输入值的偏导
+				 * dLdo与GRUFwdPassReturn.fwdPassOutput有相同的shape，shape(batchSize,hiddenLayerSize)
+				 * epsilon是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
+				 * epsilonSlice为epsilon的时间切片，shape(batchSize,hiddenLayerSize)
 				 */
-				INDArray rwGradientsOutR = rwGradientsOut.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(0, hiddenLayerSize));
-				INDArray rwGradientsOutU = rwGradientsOut.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
-				INDArray rwGradientsOutH = rwGradientsOut.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
+				INDArray dLdo = null;
+				INDArray epsilonSlice = (is2dInput ? epsilon : epsilon.tensorAlongDimension(time, 1, 0));
+
+				if (iTimeIndex != timeSeriesLength - 1) {
+					INDArray uaNext = fwdPass.ua[time + 1];
+					dLdo = uaNext.mul(-1);
+					dLdo.addi(1);
+					dLdo.muli(dLdoNext);
+				} else {
+					dLdo = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
+				}
+
+				dLdo.addi(Shape.toOffsetZeroCopy(epsilonSlice, 'f'));
+
+				INDArray raNext = null;// shape(batchSize,hiddenLayerSize)
+
+				if (iTimeIndex != timeSeriesLength - 1) {
+					raNext = fwdPass.ra[time + 1];
+				} else {
+					raNext = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
+				}
+
+				INDArray temp = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
 
 				/*
-				 * (batchSize,hiddenLayerSize)^T * (batchSize,hiddenLayerSize) =
-				 * (hiddenLayerSize,hiddenLayerSize)
+				 * (batchSize,hiddenLayerSize) * (hiddenLayerSize,hiddenLayerSize)^T =
+				 * (batchSize,hiddenLayerSize)
 				 */
-				Nd4j.gemm(prevAct, deltarNext, rwGradientsOutR, true, false, 1.0, 1.0);
-				Nd4j.gemm(prevAct, deltauNext, rwGradientsOutU, true, false, 1.0, 1.0);
-				Nd4j.gemm(prevAct.mul(ra), deltahNext, rwGradientsOutH, true, false, 1.0, 1.0);
-			}
+				Nd4j.gemm(deltarNext, recurrentWeightsR, dLdo, false, true, 1.0, 1.0);
+				Nd4j.gemm(deltauNext, recurrentWeightsU, dLdo, false, true, 1.0, 1.0);
+				Nd4j.gemm(deltahNext, recurrentWeightsH, temp, false, true, 1.0, 1.0);
 
-			if (iTimeIndex > 0 || prevAct != null) {
-				l1BLAS.axpy(3 * hiddenLayerSize, 1.0, deltaruhNext.sum(0), bGradientsOut);
-			} else {
-				INDArray uBiasGrad = bGradientsOut.get(NDArrayIndex.point(0),
-						NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
+				temp.muli(raNext);
+				dLdo.addi(temp);
+				dLdoNext = workspaceMgr.leverageTo(ArrayType.BP_WORKING_MEM, dLdo);
 
-				INDArray hBiasGrad = bGradientsOut.get(NDArrayIndex.point(0),
-						NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
+				INDArray ha = null;
+				if (iTimeIndex != timeSeriesLength - 1) {
+					ha = fwdPass.ha[time];
+				} else {
+					ha = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
+				}
 
-				l1BLAS.axpy(hiddenLayerSize, 1.0, deltau.sum(0), uBiasGrad);
-				l1BLAS.axpy(hiddenLayerSize, 1.0, deltah.sum(0), hBiasGrad);
-			}
+				INDArray uz = fwdPass.uz[time];
+				INDArray ua = fwdPass.ua[time];
+				INDArray prevAct = iTimeIndex == 0 ? fwdPass.prevAct : fwdPass.fwdPassOutputAsArrays[time - inext];// shape(batchSize,hiddenLayerSize)
 
-			/*
-			 * epsilonNextSlice = shape(batchSize, nLast)
-			 */
-			INDArray epsilonNextSlice = epsilonNext.tensorAlongDimension(time, 1, 0);
+				INDArray deltau = dLdo.dup('f');
+				if (iTimeIndex > 0 || prevAct != null) {
+					deltau.muli(ha.sub(prevAct));
+				} else {
+					deltau.muli(ha);
+				}
+				deltau.assign(gateActivationFn.backprop(uz.dup('f'), deltau).getFirst());
 
-			if (iTimeIndex > 0 || prevAct != null) {
-				Nd4j.gemm(deltaruhNext, inputWeights, epsilonNextSlice, false, true, 1.0, 1.0);
-			} else {
-				INDArray inputWeightsUH = inputWeights.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(hiddenLayerSize, 3 * hiddenLayerSize));
+				INDArray hz = fwdPass.hz[time];
+				INDArray deltah = dLdo.mul(ua);
+				deltah.assign(afn.backprop(hz.dup('f'), deltah).getFirst());
 
-				INDArray deltauhNext = deltaruhNext.get(NDArrayIndex.all(),
-						NDArrayIndex.interval(hiddenLayerSize, 3 * hiddenLayerSize));
+				INDArray rz = fwdPass.rz[time];
+				INDArray ra = fwdPass.ra[time];
+				temp = Nd4j.getExecutioner().execAndReturn(new TimesOneMinus(ra.dup('f')));
+				INDArray deltar = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
 
-				Nd4j.gemm(deltauhNext, inputWeightsUH, epsilonNextSlice, false, true, 1.0, 1.0);
-			}
+				if (prevAct != null) {
+					Nd4j.gemm(deltah, recurrentWeightsH, deltar, false, true, 1.0, 1.0);
+					deltar.muli(prevAct);
+					deltar.assign(gateActivationFn.backprop(rz.dup('f'), deltar).getFirst());
+				}
 
-			if (maskArray != null) {
-				epsilonNextSlice.muliColumnVector(timeStepMaskColumn);
-			}
+				deltarNext.assign(deltar);
+				deltauNext.assign(deltau);
+				deltahNext.assign(deltah);
 
-			if (workspace != null) {
-				workspace.close();
+				if (maskArray != null) {
+					timeStepMaskColumn = maskArray.getColumn(time);
+					deltaruhNext.muliColumnVector(timeStepMaskColumn);
+				}
+
+				INDArray prevLayerActivationSlice = Shape
+						.toMmulCompatible(is2dInput ? input : input.tensorAlongDimension(time, 1, 0));
+
+				if (iTimeIndex > 0 || prevAct != null) {
+					Nd4j.gemm(prevLayerActivationSlice, deltaruhNext, iwGradientsOut, true, false, 1.0, 1.0);
+				} else {
+					INDArray iwGradientsOutU = iwGradientsOut.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
+					INDArray iwGradientsOutH = iwGradientsOut.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
+
+					Nd4j.gemm(prevLayerActivationSlice, deltauNext, iwGradientsOutU, true, false, 1.0, 1.0);
+					Nd4j.gemm(prevLayerActivationSlice, deltahNext, iwGradientsOutH, true, false, 1.0, 1.0);
+				}
+
+				if (iTimeIndex > 0 || prevAct != null) {
+
+					/*
+					 * rwGradientsOutR|rwGradientsOutU|rwGradientsOutH
+					 * shape(hiddenLayerSize,hiddenLayerSize)
+					 */
+					INDArray rwGradientsOutR = rwGradientsOut.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(0, hiddenLayerSize));
+					INDArray rwGradientsOutU = rwGradientsOut.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
+					INDArray rwGradientsOutH = rwGradientsOut.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
+
+					/*
+					 * (batchSize,hiddenLayerSize)^T * (batchSize,hiddenLayerSize) =
+					 * (hiddenLayerSize,hiddenLayerSize)
+					 */
+					Nd4j.gemm(prevAct, deltarNext, rwGradientsOutR, true, false, 1.0, 1.0);
+					Nd4j.gemm(prevAct, deltauNext, rwGradientsOutU, true, false, 1.0, 1.0);
+					Nd4j.gemm(prevAct.mul(ra), deltahNext, rwGradientsOutH, true, false, 1.0, 1.0);
+				}
+
+				if (iTimeIndex > 0 || prevAct != null) {
+					l1BLAS.axpy(3 * hiddenLayerSize, 1.0, deltaruhNext.sum(0), bGradientsOut);
+				} else {
+					INDArray uBiasGrad = bGradientsOut.get(NDArrayIndex.point(0),
+							NDArrayIndex.interval(hiddenLayerSize, 2 * hiddenLayerSize));
+
+					INDArray hBiasGrad = bGradientsOut.get(NDArrayIndex.point(0),
+							NDArrayIndex.interval(2 * hiddenLayerSize, 3 * hiddenLayerSize));
+
+					l1BLAS.axpy(hiddenLayerSize, 1.0, deltau.sum(0), uBiasGrad);
+					l1BLAS.axpy(hiddenLayerSize, 1.0, deltah.sum(0), hBiasGrad);
+				}
+
+				/*
+				 * epsilonNextSlice = shape(batchSize, nLast)
+				 */
+				INDArray epsilonNextSlice = epsilonNext.tensorAlongDimension(time, 1, 0);
+
+				if (iTimeIndex > 0 || prevAct != null) {
+					Nd4j.gemm(deltaruhNext, inputWeights, epsilonNextSlice, false, true, 1.0, 1.0);
+				} else {
+					INDArray inputWeightsUH = inputWeights.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(hiddenLayerSize, 3 * hiddenLayerSize));
+
+					INDArray deltauhNext = deltaruhNext.get(NDArrayIndex.all(),
+							NDArrayIndex.interval(hiddenLayerSize, 3 * hiddenLayerSize));
+
+					Nd4j.gemm(deltauhNext, inputWeightsUH, epsilonNextSlice, false, true, 1.0, 1.0);
+				}
+
+				if (maskArray != null) {
+					epsilonNextSlice.muliColumnVector(timeStepMaskColumn);
+				}
 			}
 		}
 

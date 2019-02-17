@@ -35,7 +35,7 @@ public class AttentionVertex extends GraphVertex {
 	}
 
 	@Override
-	public int numParams(boolean backprop) {
+	public long numParams(boolean backprop) {
 		return 0;
 	}
 

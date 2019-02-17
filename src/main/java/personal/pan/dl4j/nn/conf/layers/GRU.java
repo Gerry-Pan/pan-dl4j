@@ -9,7 +9,7 @@ import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.BaseRecurrentLayer;
 import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
-import org.deeplearning4j.optimize.api.IterationListener;
+import org.deeplearning4j.optimize.api.TrainingListener;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.activations.impl.ActivationSigmoid;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -42,10 +42,10 @@ public class GRU extends BaseRecurrentLayer {
 	}
 
 	@Override
-	public Layer instantiate(NeuralNetConfiguration conf, Collection<IterationListener> iterationListeners,
+	public Layer instantiate(NeuralNetConfiguration conf, Collection<TrainingListener> trainingListeners,
 			int layerIndex, INDArray layerParamsView, boolean initializeParams) {
 		personal.pan.dl4j.nn.layers.recurrent.GRU layer = new personal.pan.dl4j.nn.layers.recurrent.GRU(conf);
-		layer.setListeners(iterationListeners);
+		layer.setListeners(trainingListeners);
 		layer.setIndex(layerIndex);
 		layer.setParamsViewArray(layerParamsView);
 		Map<String, INDArray> paramTable = initializer().init(conf, layerParamsView, initializeParams);

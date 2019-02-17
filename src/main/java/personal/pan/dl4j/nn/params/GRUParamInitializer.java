@@ -39,18 +39,18 @@ public class GRUParamInitializer implements ParamInitializer {
 	}
 
 	@Override
-	public int numParams(NeuralNetConfiguration conf) {
+	public long numParams(NeuralNetConfiguration conf) {
 		return numParams(conf.getLayer());
 	}
 
 	@Override
-	public int numParams(Layer l) {
+	public long numParams(Layer l) {
 		GRU layer = (GRU) l;
 
-		int nL = layer.getNOut();
-		int nLast = layer.getNIn();
+		long nL = layer.getNOut();
+		long nLast = layer.getNIn();
 
-		int nParams = nLast * (3 * nL) + nL * (3 * nL) + 3 * nL;
+		long nParams = nLast * (3 * nL) + nL * (3 * nL) + 3 * nL;
 		return nParams;
 	}
 
@@ -61,21 +61,21 @@ public class GRUParamInitializer implements ParamInitializer {
 
 		Distribution dist = Distributions.createDistribution(layer.getDist());
 
-		int nL = layer.getNOut();
-		int nLast = layer.getNIn();
+		long nL = layer.getNOut();
+		long nLast = layer.getNIn();
 
 		conf.addVariable(INPUT_WEIGHT_KEY);
 		conf.addVariable(RECURRENT_WEIGHT_KEY);
 		conf.addVariable(BIAS_KEY);
 
-		int length = numParams(conf);
+		long length = numParams(conf);
 		if (paramsView.length() != length)
 			throw new IllegalStateException(
 					"Expected params view of length " + length + ", got length " + paramsView.length());
 
-		int nParamsIn = nLast * (3 * nL);
-		int nParamsRecurrent = nL * (3 * nL);
-		int nBias = 3 * nL;
+		long nParamsIn = nLast * (3 * nL);
+		long nParamsRecurrent = nL * (3 * nL);
+		long nBias = 3 * nL;
 		INDArray inputWeightView = paramsView.get(NDArrayIndex.point(0), NDArrayIndex.interval(0, nParamsIn));
 		INDArray recurrentWeightView = paramsView.get(NDArrayIndex.point(0),
 				NDArrayIndex.interval(nParamsIn, nParamsIn + nParamsRecurrent));
@@ -83,10 +83,10 @@ public class GRUParamInitializer implements ParamInitializer {
 				NDArrayIndex.interval(nParamsIn + nParamsRecurrent, nParamsIn + nParamsRecurrent + nBias));
 
 		if (initializeParams) {
-			int fanIn = nL;
-			int fanOut = nLast + nL;
-			int[] inputWShape = new int[] { nLast, 3 * nL };
-			int[] recurrentWShape = new int[] { nL, 3 * nL };
+			long fanIn = nL;
+			long fanOut = nLast + nL;
+			long[] inputWShape = new long[] { nLast, 3 * nL };
+			long[] recurrentWShape = new long[] { nL, 3 * nL };
 
 			params.put(INPUT_WEIGHT_KEY, WeightInitUtil.initWeights(fanIn, fanOut, inputWShape, layer.getWeightInit(),
 					dist, inputWeightView));
@@ -97,9 +97,9 @@ public class GRUParamInitializer implements ParamInitializer {
 
 			params.put(BIAS_KEY, biasView);
 		} else {
-			params.put(INPUT_WEIGHT_KEY, WeightInitUtil.reshapeWeights(new int[] { nLast, 3 * nL }, inputWeightView));
+			params.put(INPUT_WEIGHT_KEY, WeightInitUtil.reshapeWeights(new long[] { nLast, 3 * nL }, inputWeightView));
 			params.put(RECURRENT_WEIGHT_KEY,
-					WeightInitUtil.reshapeWeights(new int[] { nL, 3 * nL }, recurrentWeightView));
+					WeightInitUtil.reshapeWeights(new long[] { nL, 3 * nL }, recurrentWeightView));
 			params.put(BIAS_KEY, biasView);
 		}
 
@@ -110,17 +110,17 @@ public class GRUParamInitializer implements ParamInitializer {
 	public Map<String, INDArray> getGradientsFromFlattened(NeuralNetConfiguration conf, INDArray gradientView) {
 		GRU layer = (GRU) conf.getLayer();
 
-		int nL = layer.getNOut();
-		int nLast = layer.getNIn();
+		long nL = layer.getNOut();
+		long nLast = layer.getNIn();
 
-		int length = numParams(conf);
+		long length = numParams(conf);
 		if (gradientView.length() != length)
 			throw new IllegalStateException(
 					"Expected gradient view of length " + length + ", got length " + gradientView.length());
 
-		int nParamsIn = nLast * (3 * nL);
-		int nParamsRecurrent = nL * (3 * nL);
-		int nBias = 3 * nL;
+		long nParamsIn = nLast * (3 * nL);
+		long nParamsRecurrent = nL * (3 * nL);
+		long nBias = 3 * nL;
 		INDArray inputWeightGradView = gradientView.get(NDArrayIndex.point(0), NDArrayIndex.interval(0, nParamsIn))
 				.reshape('f', nLast, 3 * nL);
 		INDArray recurrentWeightGradView = gradientView
