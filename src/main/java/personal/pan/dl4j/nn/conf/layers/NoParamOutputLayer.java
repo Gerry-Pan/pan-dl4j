@@ -9,35 +9,40 @@ import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.layers.BaseOutputLayer;
 import org.deeplearning4j.nn.conf.layers.LayerValidation;
 import org.deeplearning4j.nn.params.DefaultParamInitializer;
-import org.deeplearning4j.optimize.api.IterationListener;
+import org.deeplearning4j.optimize.api.TrainingListener;
+import org.nd4j.linalg.activations.impl.ActivationSoftmax;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-public class CosineOutputLayer extends BaseOutputLayer {
+@Data
+@NoArgsConstructor
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class NoParamOutputLayer extends BaseOutputLayer {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 
-	protected CosineOutputLayer() {
-		super();
-	}
-	
-	protected CosineOutputLayer(Builder builder) {
+	protected NoParamOutputLayer(Builder builder) {
 		super(builder);
+		initializeConstraints(builder);
 	}
 
 	@Override
-	public Layer instantiate(NeuralNetConfiguration conf, Collection<IterationListener> iterationListeners,
+	public Layer instantiate(NeuralNetConfiguration conf, Collection<TrainingListener> trainingListeners,
 			int layerIndex, INDArray layerParamsView, boolean initializeParams) {
-		LayerValidation.assertNInNOutSet("OutputLayer", getLayerName(), layerIndex, getNIn(), getNOut());
+		LayerValidation.assertNInNOutSet("NoParamOutputLayer", getLayerName(), layerIndex, getNIn(), getNOut());
 
-		personal.pan.dl4j.nn.layers.CosineOutputLayer ret = new personal.pan.dl4j.nn.layers.CosineOutputLayer(conf);
-		ret.setListeners(iterationListeners);
+		personal.pan.dl4j.nn.layers.NoParamOutputLayer ret = new personal.pan.dl4j.nn.layers.NoParamOutputLayer(conf);
+		ret.setListeners(trainingListeners);
 		ret.setIndex(layerIndex);
 		ret.setParamsViewArray(layerParamsView);
 		Map<String, INDArray> paramTable = initializer().init(conf, layerParamsView, initializeParams);
@@ -51,25 +56,26 @@ public class CosineOutputLayer extends BaseOutputLayer {
 		return DefaultParamInitializer.getInstance();
 	}
 
-	@NoArgsConstructor
 	public static class Builder extends BaseOutputLayer.Builder<Builder> {
 
 		public Builder() {
-
+			this.activationFn = new ActivationSoftmax();
 		}
 
 		public Builder(LossFunction lossFunction) {
 			super.lossFunction(lossFunction);
+			this.activationFn = new ActivationSoftmax();
 		}
 
 		public Builder(ILossFunction lossFunction) {
 			this.lossFn = lossFunction;
+			this.activationFn = new ActivationSoftmax();
 		}
 
 		@Override
 		@SuppressWarnings("unchecked")
-		public CosineOutputLayer build() {
-			return new CosineOutputLayer(this);
+		public NoParamOutputLayer build() {
+			return new NoParamOutputLayer(this);
 		}
 	}
 }
