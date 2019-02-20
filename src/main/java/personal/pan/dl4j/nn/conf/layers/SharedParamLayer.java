@@ -7,9 +7,10 @@ import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.distribution.Distribution;
+import org.deeplearning4j.nn.conf.graph.MergeVertex;
+import org.deeplearning4j.nn.conf.graph.SubsetVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
-import org.deeplearning4j.nn.conf.layers.Layer;
 import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
 import org.deeplearning4j.nn.conf.weightnoise.IWeightNoise;
 import org.deeplearning4j.nn.weights.WeightInit;
@@ -25,6 +26,12 @@ import lombok.ToString;
 import personal.pan.dl4j.nn.params.SharedParamLayerParamInitializer;
 
 /**
+ * 共用参数层，与{@link MergeVertex}和{@link SubsetVertex}结合使用 。<br>
+ * 层与层共用参数，总损失值对该参数的梯度为，各层梯度的和。<br>
+ * <br>
+ * L_total=L_1 + L_2<br>
+ * ∂L_total/∂θ=∂L_1/∂θ + ∂L_2/∂θ<br>
+ * <br>
  * 2019-2-16
  * 
  * @author Jerry Pan
@@ -43,7 +50,7 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 	private long inputCount;
 
-	private Layer layer;
+	private FeedForwardLayer layer;
 
 	private SharedParamLayer(Builder builder) {
 		super(builder);
@@ -51,12 +58,8 @@ public class SharedParamLayer extends FeedForwardLayer {
 		this.layer = builder.layer;
 		this.inputCount = builder.inputCount;
 
-		if (layer instanceof FeedForwardLayer) {
-			FeedForwardLayer ffLayer = (FeedForwardLayer) layer;
-
-			this.nIn = ffLayer.getNIn();
-			this.nOut = ffLayer.getNOut();
-		}
+		this.nIn = layer.getNIn();
+		this.nOut = layer.getNOut();
 
 		initializeConstraints(builder);
 	}
@@ -108,37 +111,37 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 	@Override
 	public void setIUpdater(IUpdater iUpdater) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setIUpdater(iUpdater);
+		layer.setIUpdater(iUpdater);
 	}
 
 	@Override
 	public IUpdater getIUpdater() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getIUpdater();
+		return layer.getIUpdater();
 	}
 
 	@Override
 	public void setBiasUpdater(IUpdater biasUpdater) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setBiasUpdater(biasUpdater);
+		layer.setBiasUpdater(biasUpdater);
 	}
 
 	@Override
 	public IUpdater getBiasUpdater() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getBiasUpdater();
+		return layer.getBiasUpdater();
 	}
 
 	@Override
 	public void setWeightInit(WeightInit weightInit) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setWeightInit(weightInit);
+		layer.setWeightInit(weightInit);
 	}
 
 	@Override
 	public void setBiasInit(double biasInit) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setBiasInit(biasInit);
+		layer.setBiasInit(biasInit);
 	}
 
 	@Override
 	public void setL1(double l1) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setL1(l1);
+		layer.setL1(l1);
 	}
 
 	@Override
@@ -164,108 +167,107 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 	@Override
 	public IActivation getActivationFn() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getActivationFn();
+		return layer.getActivationFn();
 	}
 
 	@Override
 	public double getBiasInit() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getBiasInit();
+		return layer.getBiasInit();
 	}
 
 	@Override
 	public Distribution getDist() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getDist();
+		return layer.getDist();
 	}
 
 	@Override
 	public double getL1() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getL1();
+		return layer.getL1();
 	}
 
 	@Override
 	public double getL1Bias() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getL1Bias();
+		return layer.getL1Bias();
 	}
 
 	@Override
 	public double getL2() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getL2();
+		return layer.getL2();
 	}
 
 	@Override
 	public double getL2Bias() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getL2Bias();
+		return layer.getL2Bias();
 	}
 
 	@Override
 	public WeightInit getWeightInit() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getWeightInit();
+		return layer.getWeightInit();
 	}
 
 	@Override
 	public IWeightNoise getWeightNoise() {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getWeightNoise();
+		return layer.getWeightNoise();
 	}
 
 	@Override
 	public void setActivationFn(IActivation activationFn) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setActivationFn(activationFn);
+		layer.setActivationFn(activationFn);
 	}
 
 	@Override
 	public void setDist(Distribution dist) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setDist(dist);
+		layer.setDist(dist);
 	}
 
 	@Override
 	public void setGradientNormalization(GradientNormalization gradientNormalization) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setGradientNormalization(gradientNormalization);
+		layer.setGradientNormalization(gradientNormalization);
 	}
 
 	@Override
 	public void setGradientNormalizationThreshold(double gradientNormalizationThreshold) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer)
-				.setGradientNormalizationThreshold(gradientNormalizationThreshold);
+		layer.setGradientNormalizationThreshold(gradientNormalizationThreshold);
 	}
 
 	@Override
 	public void setL1Bias(double l1Bias) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setL1Bias(l1Bias);
+		layer.setL1Bias(l1Bias);
 	}
 
 	@Override
 	public void setL2(double l2) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setL2(l2);
+		layer.setL2(l2);
 	}
 
 	@Override
 	public void setL2Bias(double l2Bias) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setL2Bias(l2Bias);
+		layer.setL2Bias(l2Bias);
 	}
 
 	@Override
 	public void setWeightNoise(IWeightNoise weightNoise) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setWeightNoise(weightNoise);
+		layer.setWeightNoise(weightNoise);
 	}
 
 	@Override
 	public IUpdater getUpdaterByParam(String paramName) {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getUpdaterByParam(paramName);
+		return layer.getUpdaterByParam(paramName);
 	}
 
 	@Override
 	public InputType getOutputType(int layerIndex, InputType inputType) {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getOutputType(layerIndex, inputType);
+		return layer.getOutputType(layerIndex, inputType);
 	}
 
 	@Override
 	public InputPreProcessor getPreProcessorForInputType(InputType inputType) {
-		return ((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).getPreProcessorForInputType(inputType);
+		return layer.getPreProcessorForInputType(inputType);
 	}
 
 	@Override
 	public void setNIn(InputType inputType, boolean override) {
-		((org.deeplearning4j.nn.conf.layers.BaseLayer) layer).setNIn(inputType, override);
+		layer.setNIn(inputType, override);
 	}
 
 	public long inputCount() {
@@ -281,7 +283,7 @@ public class SharedParamLayer extends FeedForwardLayer {
 	@NoArgsConstructor
 	public static class Builder extends FeedForwardLayer.Builder<Builder> {
 
-		private Layer layer;
+		private FeedForwardLayer layer;
 
 		private long inputCount;
 
@@ -290,7 +292,7 @@ public class SharedParamLayer extends FeedForwardLayer {
 			return this;
 		}
 
-		public Builder layer(Layer layer) {
+		public Builder layer(FeedForwardLayer layer) {
 			this.layer = layer;
 			return this;
 		}
