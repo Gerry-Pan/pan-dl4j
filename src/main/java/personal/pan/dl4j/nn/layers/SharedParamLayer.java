@@ -17,6 +17,8 @@ import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.NDArrayIndex;
 import org.nd4j.linalg.primitives.Pair;
 
+import com.google.common.primitives.Ints;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,6 +33,9 @@ public class SharedParamLayer extends BaseLayer<personal.pan.dl4j.nn.conf.layers
 	@Setter
 	@Getter
 	private long inputCount;
+
+	@Setter
+	private int[] gradientIndexs;
 
 	@Setter
 	protected Layer layer;
@@ -84,11 +89,29 @@ public class SharedParamLayer extends BaseLayer<personal.pan.dl4j.nn.conf.layers
 		List<INDArray> epsilonList = split(epsilon);
 		List<INDArray> epsilonNextList = new LinkedList<INDArray>();
 
-		for (INDArray e : epsilonList) {
+		List<Integer> gradientIndexs = null;
+
+		if (this.gradientIndexs == null || this.gradientIndexs.length == 0) {
+			gradientIndexs = new LinkedList<Integer>();
+			for (int i = 0; i < epsilonList.size(); i++) {
+				gradientIndexs.add(i);
+			}
+		} else {
+			gradientIndexs = Ints.asList(this.gradientIndexs);
+		}
+
+		for (int i = 0; i < epsilonList.size(); i++) {
+			INDArray e = epsilonList.get(i);
 			Pair<Gradient, INDArray> pair = layer.backpropGradient(e, workspaceMgr);
 
-			Gradient singleGradient = pair.getFirst();
 			INDArray epsilonNext = pair.getSecond();
+			epsilonNextList.add(epsilonNext);
+
+			if (!gradientIndexs.contains(i)) {
+				continue;
+			}
+
+			Gradient singleGradient = pair.getFirst();
 
 			gm = singleGradient.gradientForVariable();
 
@@ -103,8 +126,6 @@ public class SharedParamLayer extends BaseLayer<personal.pan.dl4j.nn.conf.layers
 
 				gradient.setGradientFor(key, g2.addi(g1));
 			}
-
-			epsilonNextList.add(epsilonNext);
 		}
 
 		return new Pair<>(gradient, workspaceMgr.leverageTo(ArrayType.ACTIVATION_GRAD,

@@ -50,6 +50,8 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 	private long inputCount;
 
+	private int[] gradientIndexs;
+
 	private FeedForwardLayer layer;
 
 	private SharedParamLayer(Builder builder) {
@@ -57,6 +59,7 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 		this.layer = builder.layer;
 		this.inputCount = builder.inputCount;
+		this.gradientIndexs = builder.gradientIndexs;
 
 		this.nIn = layer.getNIn();
 		this.nOut = layer.getNOut();
@@ -76,6 +79,7 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 		sharedParamLayer.setLayer(l);
 		sharedParamLayer.setInputCount(this.inputCount);
+		sharedParamLayer.setGradientIndexs(this.gradientIndexs);
 		sharedParamLayer.setListeners(trainingListeners);
 		sharedParamLayer.setIndex(layerIndex);
 		sharedParamLayer.setParamsViewArray(layerParamsView);
@@ -287,8 +291,21 @@ public class SharedParamLayer extends FeedForwardLayer {
 
 		private long inputCount;
 
+		private int[] gradientIndexs;
+
 		public Builder inputCount(int inputCount) {
 			this.inputCount = inputCount;
+			return this;
+		}
+
+		/**
+		 * 反向传播计算时，指定哪些输入值参与梯度计算，默认全部参与
+		 * 
+		 * @param gradientIndexs
+		 * @return
+		 */
+		public Builder gradientIndexs(int[] gradientIndexs) {
+			this.gradientIndexs = gradientIndexs;
 			return this;
 		}
 
