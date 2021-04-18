@@ -5,6 +5,7 @@ import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.inputs.InvalidInputTypeException;
 import org.deeplearning4j.nn.conf.memory.MemoryReport;
 import org.deeplearning4j.nn.graph.ComputationGraph;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 
 /**
@@ -51,8 +52,8 @@ public class AttentionVertex extends GraphVertex {
 
 	@Override
 	public org.deeplearning4j.nn.graph.vertex.GraphVertex instantiate(ComputationGraph graph, String name, int idx,
-			INDArray paramsView, boolean initializeParams) {
-		return new personal.pan.dl4j.nn.graph.AttentionVertex(graph, name, idx);
+			INDArray paramsView, boolean initializeParams, DataType networkDatatype) {
+		return new personal.pan.dl4j.nn.graph.AttentionVertex(graph, name, idx, networkDatatype);
 	}
 
 	@Override

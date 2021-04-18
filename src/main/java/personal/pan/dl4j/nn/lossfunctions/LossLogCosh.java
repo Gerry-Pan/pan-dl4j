@@ -6,21 +6,21 @@ import java.util.Map;
 import org.nd4j.autodiff.functions.DifferentialFunction;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
-import org.nd4j.base.Preconditions;
+import org.nd4j.common.base.Preconditions;
+import org.nd4j.common.primitives.Pair;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.Op;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossUtil;
 import org.nd4j.linalg.ops.transforms.Transforms;
-import org.nd4j.linalg.primitives.Pair;
 import org.tensorflow.framework.AttrValue;
 import org.tensorflow.framework.GraphDef;
 import org.tensorflow.framework.NodeDef;
 
-import onnx.OnnxProto3.AttributeProto;
-import onnx.OnnxProto3.GraphProto;
-import onnx.OnnxProto3.NodeProto;
+import onnx.Onnx.AttributeProto;
+import onnx.Onnx.GraphProto;
+import onnx.Onnx.NodeProto;
 
 public class LossLogCosh extends DifferentialFunction implements ILossFunction {
 
@@ -147,6 +147,11 @@ public class LossLogCosh extends DifferentialFunction implements ILossFunction {
 	@Override
 	public String tensorflowName() {
 		return "LogCoshLoss";
+	}
+
+	@Override
+	public void clearArrays() {
+
 	}
 
 }

@@ -15,10 +15,10 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<java.version>1.8</java.version>
-		<nd4j.version>1.0.0-beta3</nd4j.version>
-		<dl4j.version>1.0.0-beta3</dl4j.version>
-		<!-- <nd4j.backend>nd4j-native-platform</nd4j.backend> -->
-		<nd4j.backend>nd4j-cuda-9.2-platform</nd4j.backend>
+		<nd4j.version>1.0.0-beta7</nd4j.version>
+		<dl4j.version>1.0.0-beta7</dl4j.version>
+		<nd4j.backend>nd4j-native-platform</nd4j.backend>
+		<!-- <nd4j.backend>nd4j-cuda-9.2-platform</nd4j.backend> -->
 		<lombok.version>1.16.20</lombok.version>
 	</properties>
 

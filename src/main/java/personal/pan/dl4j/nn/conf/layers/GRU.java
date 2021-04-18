@@ -12,6 +12,7 @@ import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
 import org.deeplearning4j.optimize.api.TrainingListener;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.activations.impl.ActivationSigmoid;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 
 import personal.pan.dl4j.nn.layers.recurrent.GRUHelpers;
@@ -43,8 +44,9 @@ public class GRU extends BaseRecurrentLayer {
 
 	@Override
 	public Layer instantiate(NeuralNetConfiguration conf, Collection<TrainingListener> trainingListeners,
-			int layerIndex, INDArray layerParamsView, boolean initializeParams) {
-		personal.pan.dl4j.nn.layers.recurrent.GRU layer = new personal.pan.dl4j.nn.layers.recurrent.GRU(conf);
+			int layerIndex, INDArray layerParamsView, boolean initializeParams, DataType networkDatatype) {
+		personal.pan.dl4j.nn.layers.recurrent.GRU layer = new personal.pan.dl4j.nn.layers.recurrent.GRU(conf,
+				networkDatatype);
 		layer.setListeners(trainingListeners);
 		layer.setIndex(layerIndex);
 		layer.setParamsViewArray(layerParamsView);
@@ -57,32 +59,6 @@ public class GRU extends BaseRecurrentLayer {
 	@Override
 	public ParamInitializer initializer() {
 		return GRUParamInitializer.INSTANCE;
-	}
-
-	@Override
-	public double getL1ByParam(String paramName) {
-		switch (paramName) {
-		case GRUParamInitializer.INPUT_WEIGHT_KEY:
-		case GRUParamInitializer.RECURRENT_WEIGHT_KEY:
-			return l1;
-		case GRUParamInitializer.BIAS_KEY:
-			return l1Bias;
-		default:
-			throw new IllegalArgumentException("Unknown parameter name: \"" + paramName + "\"");
-		}
-	}
-
-	@Override
-	public double getL2ByParam(String paramName) {
-		switch (paramName) {
-		case GRUParamInitializer.INPUT_WEIGHT_KEY:
-		case GRUParamInitializer.RECURRENT_WEIGHT_KEY:
-			return l2;
-		case GRUParamInitializer.BIAS_KEY:
-			return l2Bias;
-		default:
-			throw new IllegalArgumentException("Unknown parameter name: \"" + paramName + "\"");
-		}
 	}
 
 	@Override

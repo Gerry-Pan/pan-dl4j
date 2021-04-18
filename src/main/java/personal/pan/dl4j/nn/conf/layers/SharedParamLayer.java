@@ -6,16 +6,15 @@ import org.deeplearning4j.nn.api.ParamInitializer;
 import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.distribution.Distribution;
 import org.deeplearning4j.nn.conf.graph.MergeVertex;
 import org.deeplearning4j.nn.conf.graph.SubsetVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.conf.memory.LayerMemoryReport;
 import org.deeplearning4j.nn.conf.weightnoise.IWeightNoise;
-import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.api.TrainingListener;
 import org.nd4j.linalg.activations.IActivation;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.learning.config.IUpdater;
 
@@ -70,12 +69,12 @@ public class SharedParamLayer extends FeedForwardLayer {
 	@Override
 	public org.deeplearning4j.nn.api.Layer instantiate(NeuralNetConfiguration conf,
 			Collection<TrainingListener> trainingListeners, int layerIndex, INDArray layerParamsView,
-			boolean initializeParams) {
+			boolean initializeParams, DataType networkDatatype) {
 		personal.pan.dl4j.nn.layers.SharedParamLayer sharedParamLayer = new personal.pan.dl4j.nn.layers.SharedParamLayer(
-				conf);
+				conf, networkDatatype);
 
 		org.deeplearning4j.nn.api.Layer l = layer.instantiate(getInnerConf(conf), trainingListeners, layerIndex,
-				layerParamsView, initializeParams);
+				layerParamsView, initializeParams, networkDatatype);
 
 		sharedParamLayer.setLayer(l);
 		sharedParamLayer.setInputCount(this.inputCount);
@@ -96,16 +95,6 @@ public class SharedParamLayer extends FeedForwardLayer {
 	@Override
 	public LayerMemoryReport getMemoryReport(InputType inputType) {
 		return layer.getMemoryReport(inputType);
-	}
-
-	@Override
-	public double getL1ByParam(String paramName) {
-		return layer.getL1ByParam(paramName);
-	}
-
-	@Override
-	public double getL2ByParam(String paramName) {
-		return layer.getL2ByParam(paramName);
 	}
 
 	@Override
@@ -134,18 +123,8 @@ public class SharedParamLayer extends FeedForwardLayer {
 	}
 
 	@Override
-	public void setWeightInit(WeightInit weightInit) {
-		layer.setWeightInit(weightInit);
-	}
-
-	@Override
 	public void setBiasInit(double biasInit) {
 		layer.setBiasInit(biasInit);
-	}
-
-	@Override
-	public void setL1(double l1) {
-		layer.setL1(l1);
 	}
 
 	@Override
@@ -156,11 +135,6 @@ public class SharedParamLayer extends FeedForwardLayer {
 	@Override
 	public double getGradientNormalizationThreshold() {
 		return layer.getGradientNormalizationThreshold();
-	}
-
-	@Override
-	public boolean isPretrain() {
-		return layer.isPretrain();
 	}
 
 	@Override
@@ -180,36 +154,6 @@ public class SharedParamLayer extends FeedForwardLayer {
 	}
 
 	@Override
-	public Distribution getDist() {
-		return layer.getDist();
-	}
-
-	@Override
-	public double getL1() {
-		return layer.getL1();
-	}
-
-	@Override
-	public double getL1Bias() {
-		return layer.getL1Bias();
-	}
-
-	@Override
-	public double getL2() {
-		return layer.getL2();
-	}
-
-	@Override
-	public double getL2Bias() {
-		return layer.getL2Bias();
-	}
-
-	@Override
-	public WeightInit getWeightInit() {
-		return layer.getWeightInit();
-	}
-
-	@Override
 	public IWeightNoise getWeightNoise() {
 		return layer.getWeightNoise();
 	}
@@ -220,11 +164,6 @@ public class SharedParamLayer extends FeedForwardLayer {
 	}
 
 	@Override
-	public void setDist(Distribution dist) {
-		layer.setDist(dist);
-	}
-
-	@Override
 	public void setGradientNormalization(GradientNormalization gradientNormalization) {
 		layer.setGradientNormalization(gradientNormalization);
 	}
@@ -232,21 +171,6 @@ public class SharedParamLayer extends FeedForwardLayer {
 	@Override
 	public void setGradientNormalizationThreshold(double gradientNormalizationThreshold) {
 		layer.setGradientNormalizationThreshold(gradientNormalizationThreshold);
-	}
-
-	@Override
-	public void setL1Bias(double l1Bias) {
-		layer.setL1Bias(l1Bias);
-	}
-
-	@Override
-	public void setL2(double l2) {
-		layer.setL2(l2);
-	}
-
-	@Override
-	public void setL2Bias(double l2Bias) {
-		layer.setL2Bias(l2Bias);
 	}
 
 	@Override

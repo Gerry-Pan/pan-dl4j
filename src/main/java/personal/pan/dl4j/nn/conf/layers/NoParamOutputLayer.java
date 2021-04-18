@@ -11,6 +11,7 @@ import org.deeplearning4j.nn.conf.layers.LayerValidation;
 import org.deeplearning4j.nn.params.DefaultParamInitializer;
 import org.deeplearning4j.optimize.api.TrainingListener;
 import org.nd4j.linalg.activations.impl.ActivationSoftmax;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
@@ -38,10 +39,10 @@ public class NoParamOutputLayer extends BaseOutputLayer {
 
 	@Override
 	public Layer instantiate(NeuralNetConfiguration conf, Collection<TrainingListener> trainingListeners,
-			int layerIndex, INDArray layerParamsView, boolean initializeParams) {
+			int layerIndex, INDArray layerParamsView, boolean initializeParams, DataType networkDatatype) {
 		LayerValidation.assertNInNOutSet("NoParamOutputLayer", getLayerName(), layerIndex, getNIn(), getNOut());
 
-		personal.pan.dl4j.nn.layers.NoParamOutputLayer ret = new personal.pan.dl4j.nn.layers.NoParamOutputLayer(conf);
+		personal.pan.dl4j.nn.layers.NoParamOutputLayer ret = new personal.pan.dl4j.nn.layers.NoParamOutputLayer(conf, networkDatatype);
 		ret.setListeners(trainingListeners);
 		ret.setIndex(layerIndex);
 		ret.setParamsViewArray(layerParamsView);

@@ -8,12 +8,11 @@ import java.util.Map;
 
 import org.deeplearning4j.nn.api.ParamInitializer;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.distribution.Distributions;
 import org.deeplearning4j.nn.conf.layers.Layer;
 import org.deeplearning4j.nn.params.DefaultParamInitializer;
+import org.deeplearning4j.nn.weights.IWeightInit;
 import org.deeplearning4j.nn.weights.WeightInitUtil;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.api.rng.distribution.Distribution;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.INDArrayIndex;
 import org.nd4j.linalg.indexing.NDArrayIndex;
@@ -59,8 +58,6 @@ public class GRUParamInitializer implements ParamInitializer {
 		GRU layer = (GRU) conf.getLayer();
 		Map<String, INDArray> params = Collections.synchronizedMap(new LinkedHashMap<String, INDArray>());
 
-		Distribution dist = Distributions.createDistribution(layer.getDist());
-
 		long nL = layer.getNOut();
 		long nLast = layer.getNIn();
 
@@ -88,10 +85,17 @@ public class GRUParamInitializer implements ParamInitializer {
 			long[] inputWShape = new long[] { nLast, 3 * nL };
 			long[] recurrentWShape = new long[] { nL, 3 * nL };
 
-			params.put(INPUT_WEIGHT_KEY, WeightInitUtil.initWeights(fanIn, fanOut, inputWShape, layer.getWeightInit(),
-					dist, inputWeightView));
-			params.put(RECURRENT_WEIGHT_KEY, WeightInitUtil.initWeights(fanIn, fanOut, recurrentWShape,
-					layer.getWeightInit(), dist, recurrentWeightView));
+			IWeightInit rwInit;
+			if (layer.getWeightInitFnRecurrent() != null) {
+				rwInit = layer.getWeightInitFnRecurrent();
+			} else {
+				rwInit = layer.getWeightInitFn();
+			}
+
+			params.put(INPUT_WEIGHT_KEY, layer.getWeightInitFn().init(fanIn, fanOut, inputWShape,
+					IWeightInit.DEFAULT_WEIGHT_INIT_ORDER, inputWeightView));
+			params.put(RECURRENT_WEIGHT_KEY, rwInit.init(fanIn, fanOut, recurrentWShape,
+					IWeightInit.DEFAULT_WEIGHT_INIT_ORDER, recurrentWeightView));
 			biasView.put(new INDArrayIndex[] { NDArrayIndex.point(0), NDArrayIndex.interval(nL, 2 * nL) },
 					Nd4j.valueArrayOf(1, nL, 1));
 

@@ -7,8 +7,9 @@ import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.layers.recurrent.BaseRecurrentLayer;
 import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
+import org.nd4j.common.primitives.Pair;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.primitives.Pair;
 
 import personal.pan.dl4j.nn.params.GRUParamInitializer;
 
@@ -29,8 +30,8 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 
 	protected GRUFwdPassReturn cachedFwdPass;
 
-	public GRU(NeuralNetConfiguration conf) {
-		super(conf);
+	public GRU(NeuralNetConfiguration conf, DataType dataType) {
+		super(conf, dataType);
 	}
 
 	public boolean isPretrainLayer() {
@@ -92,7 +93,7 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		return GRUHelpers.backpropGradientHelper(this.conf, this.layerConf().getGateActivationFn(), this.input,
 				recurrentWeights, inputWeights, epsilon, truncatedBPTT, tbpttBackwardLength, fwdPass,
 				GRUParamInitializer.INPUT_WEIGHT_KEY, GRUParamInitializer.RECURRENT_WEIGHT_KEY,
-				GRUParamInitializer.BIAS_KEY, gradientViews, maskArray, workspaceMgr);
+				GRUParamInitializer.BIAS_KEY, gradientViews, maskArray, workspaceMgr, getDataType());
 	}
 
 	public INDArray preOutput(INDArray x, LayerWorkspaceMgr workspaceMgr) {
@@ -139,7 +140,7 @@ public class GRU extends BaseRecurrentLayer<personal.pan.dl4j.nn.conf.layers.GRU
 		GRUFwdPassReturn fwd = GRUHelpers.activateHelper(this, this.conf, this.layerConf().getGateActivationFn(),
 				this.input, recurrentWeights, inputWeights, biases, training, prevOutputActivations,
 				forBackprop || (cacheMode != CacheMode.NONE && training), GRUParamInitializer.INPUT_WEIGHT_KEY,
-				maskArray, forBackprop ? cacheMode : CacheMode.NONE, workspaceMgr);
+				maskArray, forBackprop ? cacheMode : CacheMode.NONE, workspaceMgr, getDataType());
 
 		if (training && cacheMode != CacheMode.NONE) {
 			cachedFwdPass = fwd;

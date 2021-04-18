@@ -12,15 +12,16 @@ import org.deeplearning4j.nn.gradient.DefaultGradient;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.workspace.ArrayType;
 import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
+import org.nd4j.common.primitives.Pair;
 import org.nd4j.linalg.activations.IActivation;
 import org.nd4j.linalg.api.blas.Level1;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.memory.MemoryWorkspace;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.api.ops.impl.transforms.TimesOneMinus;
+import org.nd4j.linalg.api.ops.impl.transforms.same.TimesOneMinus;
 import org.nd4j.linalg.api.shape.Shape;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.NDArrayIndex;
-import org.nd4j.linalg.primitives.Pair;
 
 /**
  * created on 2017-12-29
@@ -34,7 +35,7 @@ public class GRUHelpers {
 			final IActivation gateActivationFn, final INDArray input, final INDArray recurrentWeights,
 			final INDArray originalInputWeights, final INDArray biases, final boolean training,
 			final INDArray originalPrevOutputActivations, boolean forBackprop, final String inputWeightKey,
-			INDArray maskArray, final CacheMode cacheMode, final LayerWorkspaceMgr workspaceMgr) {
+			INDArray maskArray, final CacheMode cacheMode, final LayerWorkspaceMgr workspaceMgr, DataType dataType) {
 
 		if (input == null || input.length() == 0) {
 			throw new IllegalArgumentException("Invalid input: not set or 0 length");
@@ -83,14 +84,14 @@ public class GRUHelpers {
 					toReturn.fwdPassOutput = outputActivations;
 				}
 			} else {
-				outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS,
-						new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f'); // F order to keep time
+				outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS, dataType,
+						new long[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f'); // F order to keep time
 																								// steps together
 				toReturn.fwdPassOutput = outputActivations;
 			}
 		} else {
-			outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS,
-					new int[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f');
+			outputActivations = workspaceMgr.create(ArrayType.ACTIVATIONS, dataType,
+					new long[] { miniBatchSize, hiddenLayerSize, timeSeriesLength }, 'f');
 			toReturn.fwdPassOutput = outputActivations;
 		}
 
@@ -184,14 +185,10 @@ public class GRUHelpers {
 	 * 
 	 * @param conf
 	 * @param gateActivationFn
-	 * @param input
-	 *            shape(batchSize,nLast,timeSeriesLength)
-	 * @param recurrentWeights
-	 *            shape(hiddenLayerSize,3*hiddenLayerSize)
-	 * @param inputWeights
-	 *            shape(nLast,3*hiddenLayerSize)
-	 * @param epsilon
-	 *            是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
+	 * @param input               shape(batchSize,nLast,timeSeriesLength)
+	 * @param recurrentWeights    shape(hiddenLayerSize,3*hiddenLayerSize)
+	 * @param inputWeights        shape(nLast,3*hiddenLayerSize)
+	 * @param epsilon             是损失函数对后一层输入值的偏导，shape(batchSize,hiddenLayerSize,timeSeriesLength)
 	 * @param truncatedBPTT
 	 * @param tbpttBackwardLength
 	 * @param fwdPass
@@ -207,7 +204,7 @@ public class GRUHelpers {
 			final INDArray inputWeights, final INDArray epsilon, final boolean truncatedBPTT,
 			final int tbpttBackwardLength, final GRUFwdPassReturn fwdPass, final String inputWeightKey,
 			final String recurrentWeightKey, final String biasWeightKey, final Map<String, INDArray> gradientViews,
-			INDArray maskArray, final LayerWorkspaceMgr workspaceMgr) {
+			INDArray maskArray, final LayerWorkspaceMgr workspaceMgr, DataType dataType) {
 
 		long miniBatchSize = epsilon.size(0);
 		boolean is2dInput = epsilon.rank() < 3;
@@ -254,7 +251,7 @@ public class GRUHelpers {
 		INDArray dLdoNext = null;
 
 		INDArray timeStepMaskColumn = null;
-		INDArray epsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD,
+		INDArray epsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, dataType,
 				new long[] { miniBatchSize, prevLayerSize, timeSeriesLength }, 'f');
 		IActivation afn = ((org.deeplearning4j.nn.conf.layers.BaseLayer) conf.getLayer()).getActivationFn();
 
@@ -330,7 +327,7 @@ public class GRUHelpers {
 
 				INDArray rz = fwdPass.rz[time];
 				INDArray ra = fwdPass.ra[time];
-				temp = Nd4j.getExecutioner().execAndReturn(new TimesOneMinus(ra.dup('f')));
+				temp = Nd4j.getExecutioner().exec(new TimesOneMinus(ra.dup('f')));
 				INDArray deltar = Nd4j.create(new long[] { miniBatchSize, hiddenLayerSize }, 'f');
 
 				if (prevAct != null) {

@@ -8,16 +8,18 @@ import org.deeplearning4j.nn.graph.vertex.BaseGraphVertex;
 import org.deeplearning4j.nn.graph.vertex.VertexIndices;
 import org.deeplearning4j.nn.workspace.ArrayType;
 import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
+import org.nd4j.common.primitives.Pair;
+import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.api.ops.impl.transforms.Or;
-import org.nd4j.linalg.api.ops.impl.transforms.SoftMaxDerivative;
+import org.nd4j.linalg.api.ops.impl.transforms.gradient.SoftmaxBp;
+import org.nd4j.linalg.api.ops.impl.transforms.pairwise.bool.Or;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.INDArrayIndex;
 import org.nd4j.linalg.indexing.NDArrayIndex;
 import org.nd4j.linalg.ops.transforms.Transforms;
-import org.nd4j.linalg.primitives.Pair;
 
 /**
+ * This Vertex is ineffective now.
  * 
  * @author Jerry
  *
@@ -29,13 +31,13 @@ public class AttentionVertex extends BaseGraphVertex {
 	 */
 	private static final long serialVersionUID = 1L;
 
-	public AttentionVertex(ComputationGraph graph, String name, int vertexIndex) {
-		super(graph, name, vertexIndex, null, null);
+	public AttentionVertex(ComputationGraph graph, String name, int vertexIndex, DataType dataType) {
+		super(graph, name, vertexIndex, null, null, dataType);
 	}
 
 	public AttentionVertex(ComputationGraph graph, String name, int vertexIndex, VertexIndices[] inputVertices,
-			VertexIndices[] outputVertices) {
-		super(graph, name, vertexIndex, inputVertices, outputVertices);
+			VertexIndices[] outputVertices, DataType dataType) {
+		super(graph, name, vertexIndex, inputVertices, outputVertices, dataType);
 	}
 
 	@Override
@@ -77,7 +79,7 @@ public class AttentionVertex extends BaseGraphVertex {
 		INDArray firstLastElementIdx = Nd4j.argMax(firstMaskArray, 1);
 		INDArray secondLastElementIdx = Nd4j.argMax(secondMaskArray, 1);
 
-		INDArray result = workspaceMgr.create(ArrayType.ACTIVATIONS, fwdPassShape);
+		INDArray result = workspaceMgr.create(ArrayType.ACTIVATIONS, getDataType(), fwdPassShape);
 
 		for (int i = 0; i < batchSize; i++) {
 			int firstLastIdx = (int) firstLastElementIdx.getDouble(i);
@@ -122,8 +124,8 @@ public class AttentionVertex extends BaseGraphVertex {
 		INDArray firstLastElementIdx = Nd4j.argMax(firstMaskArray, 1);
 		INDArray secondLastElementIdx = Nd4j.argMax(secondMaskArray, 1);
 
-		INDArray x1EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, x1.shape());
-		INDArray x2EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, x2.shape());
+		INDArray x1EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, getDataType(), x1.shape());
+		INDArray x2EpsilonNext = workspaceMgr.create(ArrayType.ACTIVATION_GRAD, getDataType(), x2.shape());
 
 		for (int i = 0; i < batchSize; i++) {
 			int firstLastIdx = (int) firstLastElementIdx.getDouble(i);
@@ -136,7 +138,7 @@ public class AttentionVertex extends BaseGraphVertex {
 
 			INDArray alpha = k.transpose().mmul(q).div(Math.sqrt(dk));
 			INDArray softMax = Transforms.softmax(alpha);
-			INDArray softMaxDerivative = Nd4j.getExecutioner().exec(new SoftMaxDerivative(alpha)).z();
+			INDArray softMaxDerivative = Nd4j.getExecutioner().exec(new SoftmaxBp(alpha, null, null, null))[0];
 
 			INDArray e = epsilon.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
 					NDArrayIndex.interval(0, secondLastIdx + 1) });
@@ -193,10 +195,8 @@ public class AttentionVertex extends BaseGraphVertex {
 	/**
 	 * scaled dot-product attention
 	 * 
-	 * @param q
-	 *            shape(w2vLayerSize, timeLenthForQ)
-	 * @param k
-	 *            shape(w2vLayerSize, timeLenthForK)
+	 * @param q shape(w2vLayerSize, timeLenthForQ)
+	 * @param k shape(w2vLayerSize, timeLenthForK)
 	 */
 	protected INDArray attention(INDArray q, INDArray k) {
 		int dk = k.rows();
