@@ -39,7 +39,7 @@ import org.nd4j.linalg.dataset.MultiDataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
 import org.nd4j.linalg.learning.config.IUpdater;
-import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.learning.config.RmsProp;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
 import personal.pan.dl4j.nn.conf.layers.NoParamOutputLayer;
@@ -52,7 +52,8 @@ public class Gan2Test {
 	protected static DataType dataType = DataType.FLOAT;
 
 	protected static IUpdater frozenUpdater = new Adam(0.00);
-	protected static IUpdater updater = new Nesterovs(lr, 0.9);
+	protected static IUpdater updaterD = new RmsProp(lr);
+	protected static IUpdater updaterG = new RmsProp(lr);
 
 	public static void main(String[] args) {
 		train(args);
@@ -90,22 +91,29 @@ public class Gan2Test {
 							InputType.convolutional(height, width, channels))
 
 					/* -------------------------Gz------------------------- */
-					.addLayer("Gz_liner", new DenseLayer.Builder().nIn(vectorSize).nOut(4 * 4 * 512).build(), "z")
+					.addLayer("Gz_liner",
+							new DenseLayer.Builder().nIn(vectorSize).nOut(4 * 4 * 512).activation(Activation.RELU)
+									.updater(updaterG).build(),
+							"z")
 					.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(4, 4, 512)),
 							"Gz_liner")
-					.addLayer("Gz_deconv_1", new Deconvolution2D.Builder(4, 4).stride(1, 1).nIn(512).nOut(256).build(),
+					.addLayer("Gz_deconv_1",
+							new Deconvolution2D.Builder(4, 4).updater(updaterG).stride(1, 1).nIn(512).nOut(256).build(),
 							"Gz_ffToCnn")
-					.addLayer("Gz_bn_1", new BatchNormalization.Builder().nIn(256).nOut(256).decay(1).build(),
+					.addLayer("Gz_bn_1",
+							new BatchNormalization.Builder().updater(updaterG).nIn(256).nOut(256).decay(1).build(),
 							"Gz_deconv_1")
 					.addLayer("Gz_activation_1", new ActivationLayer(Activation.RELU), "Gz_bn_1")
-					.addLayer("Gz_deconv_2", new Deconvolution2D.Builder(2, 2).stride(2, 2).nIn(256).nOut(128).build(),
+					.addLayer("Gz_deconv_2",
+							new Deconvolution2D.Builder(2, 2).updater(updaterG).stride(2, 2).nIn(256).nOut(128).build(),
 							"Gz_activation_1")
-					.addLayer("Gz_bn_2", new BatchNormalization.Builder().nIn(128).nOut(128).decay(1).build(),
+					.addLayer("Gz_bn_2",
+							new BatchNormalization.Builder().updater(updaterG).nIn(128).nOut(128).decay(1).build(),
 							"Gz_deconv_2")
 					.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 					.addLayer("Gz_final",
-							new Deconvolution2D.Builder(2, 2).stride(2, 2).nIn(128).nOut(channels)
-									.activation(Activation.SIGMOID).build(),
+							new Deconvolution2D.Builder(2, 2).updater(updaterG).stride(2, 2).nIn(128).nOut(channels)
+									.activation(Activation.RELU).build(),
 							"Gz_activation_2")
 					/* -------------------------Gz------------------------- */
 
@@ -113,18 +121,21 @@ public class Gan2Test {
 
 					/* -------------------------D------------------------- */
 					.addLayer("D_conv_1",
-							new ConvolutionLayer.Builder(5, 5).stride(1, 1).nIn(channels).nOut(20).build(), "stack")
+							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(20)
+									.build(),
+							"stack")
 
 					.addLayer("D_subsample_1",
 							new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX).kernelSize(2, 2).stride(2, 2)
 									.build(),
 							"D_conv_1")
 
-					.addLayer("D_bn_1", new BatchNormalization.Builder().build(), "D_subsample_1")
+					.addLayer("D_bn_1", new BatchNormalization.Builder().updater(updaterD).build(), "D_subsample_1")
 
-					.addLayer("D_activation_1", new ActivationLayer(Activation.LEAKYRELU), "D_bn_1")
+					.addLayer("D_activation_1", new ActivationLayer(Activation.RELU), "D_bn_1")
 
-					.addLayer("D_conv_2", new ConvolutionLayer.Builder(5, 5).stride(1, 1).nIn(20).nOut(50).build(),
+					.addLayer("D_conv_2",
+							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50).build(),
 							"D_activation_1")
 
 					.addLayer("D_subsample_2",
@@ -132,12 +143,13 @@ public class Gan2Test {
 									.build(),
 							"D_conv_2")
 
-					.addLayer("D_bn_2", new BatchNormalization.Builder().build(), "D_subsample_2")
+					.addLayer("D_bn_2", new BatchNormalization.Builder().updater(updaterD).build(), "D_subsample_2")
 
-					.addLayer("D_activation", new ActivationLayer(Activation.LEAKYRELU), "D_bn_2")
+					.addLayer("D_activation", new ActivationLayer(Activation.RELU), "D_bn_2")
 
 					.addLayer("D_final",
-							new DenseLayer.Builder().nIn(4 * 4 * 50).nOut(2).activation(Activation.IDENTITY).build(),
+							new DenseLayer.Builder().nIn(4 * 4 * 50).nOut(2).updater(updaterD)
+									.activation(Activation.RELU).build(),
 							"D_activation")
 
 					/* -------------------------D------------------------- */
@@ -214,25 +226,29 @@ public class Gan2Test {
 		for (Layer layer : layers) {
 			if (layer instanceof BaseLayer) {
 				BaseLayer baseLayer = (BaseLayer) layer;
-				String layerName = baseLayer.getConf().getLayer().getLayerName();
+				org.deeplearning4j.nn.conf.layers.Layer l = baseLayer.getConf().getLayer();
+				org.deeplearning4j.nn.conf.layers.BaseLayer bl = (org.deeplearning4j.nn.conf.layers.BaseLayer) l;
+
+				IUpdater u = bl.getIUpdater();
+				String layerName = bl.getLayerName();
 				if (flag) {
 					if (layerName.startsWith("Gz_")) {
-						discriminator.setLearningRate(layerName, lr);
+						u.setLrAndSchedule(lr, null);
 					} else if (layerName.startsWith("D_")) {
-						discriminator.setLearningRate(layerName, 0);
+						u.setLrAndSchedule(0, null);
 					}
 				} else {
 					if (layerName.startsWith("Gz_")) {
-						discriminator.setLearningRate(layerName, 0);
+						u.setLrAndSchedule(0, null);
 					} else if (layerName.startsWith("D_")) {
-						discriminator.setLearningRate(layerName, lr);
+						u.setLrAndSchedule(lr, null);
 					}
 				}
 			}
 		}
 	}
 
-	public static void createMatrixImage(String fileDir, int[][] matrix) throws IOException {
+	protected static void createMatrixImage(String fileDir, int[][] matrix) throws IOException {
 		int cx = matrix.length;
 		int cy = matrix[0].length;
 		// 填充矩形高宽
