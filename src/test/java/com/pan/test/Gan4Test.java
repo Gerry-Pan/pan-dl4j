@@ -32,12 +32,12 @@ import org.nd4j.linalg.learning.config.RmsProp;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
 import personal.pan.dl4j.nn.conf.layers.NoParamOutputLayer;
+import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 public class Gan4Test {
 
 	protected static double lr = 0.001;
 	protected static double lr1 = lr * 0.1;
-	protected static double LowerBound = 0;
 
 	protected static DataType dataType = DataType.FLOAT;
 
@@ -119,7 +119,7 @@ public class Gan4Test {
 			boolean flag = false;
 			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
 
-			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, true, seed);
+			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
 
 			for (int i = 0; i < epochs; i++) {
 				if (!trainDataSetIterator.hasNext()) {
