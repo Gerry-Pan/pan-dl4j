@@ -46,7 +46,7 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 public class ConvGanTrainer {
 
 	protected static double lr = 0.001;
-	protected static double lr1 = lr * 0.2;
+	protected static double lr1 = lr * 0.1;
 
 	protected static DataType dataType = DataType.FLOAT;
 
@@ -60,7 +60,7 @@ public class ConvGanTrainer {
 	static int width = 28;
 	static int channels = 1;
 	static int batchSize = 100;
-	static int vectorSize = 20;
+	static int vectorSize = 10;
 
 	public static void main(String[] args) {
 		train();
@@ -89,16 +89,14 @@ public class ConvGanTrainer {
 					.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
 							"Gz_1")
 
-//					.addLayer("Gz_up_1", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=18,height=18
-//					.addLayer("Gz_conv_1", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(128).build(),
-//							"Gz_up_1")// width=16,height=16
-//					.addLayer("Gz_bn_1", new BatchNormalization.Builder().updater(updaterG).build(), "Gz_conv_1")
-//					.addLayer("Gz_activation_1", new ActivationLayer(Activation.RELU), "Gz_bn_1")
+					.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+							"Gz_ffToCnn")
 
-					.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
+					.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
 					.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
 							"Gz_up_2")// width=30,height=30
-					.addLayer("Gz_bn_2", new BatchNormalization.Builder().updater(updaterG).build(), "Gz_conv_2")
+					.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+							"Gz_conv_2")
 					.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 
 					.addLayer("Gz_conv_3",
@@ -118,15 +116,13 @@ public class ConvGanTrainer {
 					.addVertex("D_cnnToFf",
 							new PreprocessorVertex(new FeedForwardToCnnPreProcessor(height, width, channels)), "stack")
 
-					.addLayer("D_conv_1", new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1)
-							.nIn(channels).nOut(20).build(), "D_cnnToFf")
+					.addLayer("D_conv_1",
+							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(20)
+									.build(),
+							"D_cnnToFf")
 
-//					.addLayer("D_subsample_1",
-//							new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX).kernelSize(2, 2).stride(2, 2)
-//									.build(),
-//							"D_conv_1")
-
-					.addLayer("D_bn_1", new BatchNormalization.Builder().updater(updaterD).build(), "D_conv_1")
+					.addLayer("D_bn_1", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
+							"D_conv_1")
 
 					.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_1")
 
@@ -136,19 +132,15 @@ public class ConvGanTrainer {
 							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50).build(),
 							"D_dropout_1")
 
-//					.addLayer("D_subsample_2",
-//							new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX).kernelSize(2, 2).stride(2, 2)
-//									.build(),
-//							"D_conv_2")
-
-					.addLayer("D_bn_2", new BatchNormalization.Builder().updater(updaterD).build(), "D_conv_2")
+					.addLayer("D_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
+							"D_conv_2")
 
 					.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
 
 					.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
 
 					.addLayer("D_final",
-							new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.1))
+							new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
 									.build(),
 							"D_dropout_2")
 
@@ -170,8 +162,6 @@ public class ConvGanTrainer {
 
 			discriminator = new ComputationGraph(graphConfiguration);
 			discriminator.init();
-
-			System.out.println(discriminator.summary());
 
 			boolean flag = false;
 			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
