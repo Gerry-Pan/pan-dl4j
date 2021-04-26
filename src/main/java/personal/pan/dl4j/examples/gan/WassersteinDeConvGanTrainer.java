@@ -21,9 +21,8 @@ import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.ActivationLayer;
 import org.deeplearning4j.nn.conf.layers.BatchNormalization;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.Deconvolution2D;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
-import org.deeplearning4j.nn.conf.layers.DropoutLayer;
-import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 import org.deeplearning4j.nn.conf.preprocessor.CnnToFeedForwardPreProcessor;
 import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToCnnPreProcessor;
 import org.deeplearning4j.nn.graph.ComputationGraph;
@@ -50,19 +49,20 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
  * 效果欠佳 优化中<br />
  * <br />
  * Discriminator使用Cnn，输出层损失函数使用{@link LossWasserstein} <br />
- * Generator使用上采样和Cnn，Generator的最后一层激活函数使用SIGMOID<br />
+ * Generator使用转置Cnn，最后一层激活函数使用SIGMOID<br />
  * <br />
  * D(x)和D(Gz)的差值需要接近0<br />
+ * 本例生成的图片单一
  * 
  * @author Gerry
  *
  */
-public class WassersteinConvGanTrainer {
+public class WassersteinDeConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 2e-4;
-	static double lrG = lrD * 0.1;
+	static double lrD = 1e-4;
+	static double lrG = lrD * 0.5;
 
 	static DataType dataType = DataType.FLOAT;
 
@@ -79,7 +79,7 @@ public class WassersteinConvGanTrainer {
 	static int vectorSize = 10;
 	static double gt = 0.01;
 
-	private WassersteinConvGanTrainer() {
+	private WassersteinDeConvGanTrainer() {
 	}
 
 	public static void main(String[] args) {
@@ -107,30 +107,36 @@ public class WassersteinConvGanTrainer {
 								InputType.feedForward(vectorSize))
 
 						/* -------------------------Gz------------------------- */
-						.addLayer("Gz_1",
-								new DenseLayer.Builder().nIn(vectorSize).nOut(16 * 16 * 1).activation(Activation.RELU)
-										.weightInit(WeightInit.XAVIER).updater(updaterG).build(),
+						.addLayer("Gz_liner",
+								new DenseLayer.Builder().nIn(vectorSize).nOut(4 * 4 * 256).activation(Activation.RELU)
+										.updater(updaterG).build(),
 								"z")
-						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 1)),
-								"Gz_1")
-
-						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
-						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
-								"Gz_up_2")// width=30,height=30
-						.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
-								"Gz_conv_2")
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(4, 4, 256)),
+								"Gz_liner")
+						.addLayer("Gz_deconv_1",
+								new Deconvolution2D.Builder(4, 4).updater(updaterG).stride(1, 1).nIn(256).nOut(128)
+										.build(),
+								"Gz_ffToCnn")
+						.addLayer("Gz_bn_1",
+								new BatchNormalization.Builder().updater(updaterG).nIn(128).nOut(128).decay(0.8)
+										.build(),
+								"Gz_deconv_1")
+						.addLayer("Gz_activation_1", new ActivationLayer(Activation.RELU), "Gz_bn_1")
+						.addLayer("Gz_deconv_2",
+								new Deconvolution2D.Builder(2, 2).updater(updaterG).stride(2, 2).nIn(128).nOut(64)
+										.build(),
+								"Gz_activation_1")
+						.addLayer("Gz_bn_2",
+								new BatchNormalization.Builder().updater(updaterG).nIn(64).nOut(64).decay(0.8).build(),
+								"Gz_deconv_2")
 						.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
-
-						.addLayer("Gz_dropout_1", new DropoutLayer(0.25), "Gz_activation_2")
-
-						.addLayer("Gz_conv_3",
-								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.SIGMOID)
-										.nOut(channels).build(),
-								"Gz_dropout_1")// width=28,height=28
-
+						.addLayer("Gz_deconv_3",
+								new Deconvolution2D.Builder(2, 2).updater(updaterG).stride(2, 2).nIn(64).nOut(channels)
+										.activation(Activation.SIGMOID).build(),
+								"Gz_activation_2")
 						.addVertex("Gz_final",
 								new PreprocessorVertex(new CnnToFeedForwardPreProcessor(height, width, channels)),
-								"Gz_conv_3")
+								"Gz_deconv_3")
 
 						/* -------------------------Gz------------------------- */
 
@@ -149,8 +155,6 @@ public class WassersteinConvGanTrainer {
 
 						.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_conv_1")
 
-//						.addLayer("D_dropout_1", new DropoutLayer(0.25), "D_activation_1")
-
 						.addLayer("D_conv_2",
 								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50)
 										.gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue)
@@ -158,8 +162,6 @@ public class WassersteinConvGanTrainer {
 								"D_activation_1")
 
 						.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_conv_2")
-
-//						.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
 
 						.addLayer("D_final",
 								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(Activation.IDENTITY)
@@ -307,7 +309,7 @@ public class WassersteinConvGanTrainer {
 		}
 	}
 
-	static BufferedImage imageFromINDArray(INDArray array) {
+	private static BufferedImage imageFromINDArray(INDArray array) {
 		BufferedImage image = new BufferedImage(28, 28, BufferedImage.TYPE_BYTE_GRAY);
 		for (int i = 0; i < 784; i++) {
 			image.getRaster().setSample(i % 28, i / 28, 0, (int) (255 * array.getDouble(i)));

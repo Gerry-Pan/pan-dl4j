@@ -45,13 +45,13 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 public class ConvGanTrainer {
 
-	protected static double lr = 0.001;
-	protected static double lr1 = lr * 0.1;
+	static double lr = 0.001;
+	static double lr1 = lr * 0.1;
 
-	protected static DataType dataType = DataType.FLOAT;
+	static DataType dataType = DataType.FLOAT;
 
-	protected static IUpdater updaterD = new RmsProp(lr);
-	protected static IUpdater updaterG = new RmsProp(lr1);
+	static IUpdater updaterD = new RmsProp(lr);
+	static IUpdater updaterG = new RmsProp(lr1);
 
 	static int seed = 12345;
 	static int epochs = 200000;
@@ -239,7 +239,7 @@ public class ConvGanTrainer {
 	}
 
 	@SuppressWarnings("rawtypes")
-	protected static void frozen(ComputationGraph discriminator, boolean flag) {
+	static void frozen(ComputationGraph discriminator, boolean flag) {
 		Layer[] layers = discriminator.getLayers();
 		for (Layer layer : layers) {
 			if (layer instanceof BaseLayer) {
@@ -266,7 +266,7 @@ public class ConvGanTrainer {
 		}
 	}
 
-	protected static void writeImage(String path, INDArray indArray) {
+	static void writeImage(String path, INDArray indArray) {
 		try {
 			BufferedImage bufferedImage = imageFromINDArray(indArray);
 			if (bufferedImage == null) {
@@ -287,7 +287,7 @@ public class ConvGanTrainer {
 		return image;
 	}
 
-	protected static void saveModel(ComputationGraph discriminator, int i) throws Exception {
+	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
 //		discriminator.save(new File("D:\\test\\model\\Gan_" + i + ".zip"));
 	}
 
