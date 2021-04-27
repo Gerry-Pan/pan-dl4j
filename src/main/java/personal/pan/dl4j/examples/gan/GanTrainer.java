@@ -36,6 +36,8 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 public class GanTrainer {
 
+	private final static String PREFIX = "D:\\soft\\test\\generator";
+
 	static double lr = 0.001;
 	static double lr1 = lr * 0.1;
 
@@ -165,7 +167,7 @@ public class GanTrainer {
 					bestVisualizer.setDigits(list);
 					bestVisualizer.visualize();
 
-					writeImage("D:\\test\\generator\\image\\aaaa_" + i + ".jpg", gz);
+					writeImage(PREFIX + "\\aaaa_" + i + ".jpg", gz);
 					saveModel(discriminator, i);
 				}
 
@@ -240,7 +242,7 @@ public class GanTrainer {
 	}
 
 	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-//		discriminator.save(new File("D:\\test\\model\\Gan_" + i + ".zip"));
+//		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
 	}
 
 }

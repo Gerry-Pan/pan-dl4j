@@ -45,6 +45,8 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 public class ConvGanTrainer {
 
+	private final static String PREFIX = "D:\\soft\\test\\generator";
+
 	static double lr = 0.001;
 	static double lr1 = lr * 0.1;
 
@@ -213,7 +215,7 @@ public class ConvGanTrainer {
 					bestVisualizer.setDigits(list);
 					bestVisualizer.visualize();
 
-					writeImage("D:\\soft\\test\\generator\\aaaa_" + i + ".jpg", gz);
+					writeImage(PREFIX + "\\aaaa_" + i + ".jpg", gz);
 					saveModel(discriminator, i);
 				}
 
@@ -288,7 +290,7 @@ public class ConvGanTrainer {
 	}
 
 	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-//		discriminator.save(new File("D:\\test\\model\\Gan_" + i + ".zip"));
+//		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
 	}
 
 }
