@@ -13,6 +13,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
  * @author Jerry
  *
  */
+@Deprecated
 public class AttentionVertex extends GraphVertex {
 
 	/**

@@ -9,14 +9,13 @@ import org.deeplearning4j.nn.graph.vertex.VertexIndices;
 import org.deeplearning4j.nn.workspace.ArrayType;
 import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
 import org.nd4j.common.primitives.Pair;
+import org.nd4j.linalg.activations.impl.ActivationSoftmax;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.api.ops.impl.transforms.gradient.SoftmaxBp;
 import org.nd4j.linalg.api.ops.impl.transforms.pairwise.bool.Or;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.INDArrayIndex;
 import org.nd4j.linalg.indexing.NDArrayIndex;
-import org.nd4j.linalg.ops.transforms.Transforms;
 
 /**
  * This Vertex is ineffective now.
@@ -24,12 +23,15 @@ import org.nd4j.linalg.ops.transforms.Transforms;
  * @author Jerry
  *
  */
+@Deprecated
 public class AttentionVertex extends BaseGraphVertex {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
+
+	private ActivationSoftmax softmax = new ActivationSoftmax();
 
 	public AttentionVertex(ComputationGraph graph, String name, int vertexIndex, DataType dataType) {
 		super(graph, name, vertexIndex, null, null, dataType);
@@ -137,8 +139,8 @@ public class AttentionVertex extends BaseGraphVertex {
 					NDArrayIndex.interval(0, secondLastIdx + 1) });
 
 			INDArray alpha = k.transpose().mmul(q).div(Math.sqrt(dk));
-			INDArray softMax = Transforms.softmax(alpha);
-			INDArray softMaxDerivative = Nd4j.getExecutioner().exec(new SoftmaxBp(alpha, null, null, null))[0];
+			INDArray softMax = softmax.getActivation(alpha, true);
+			INDArray softMaxDerivative = softmax.backprop(alpha, softMax).getFirst();
 
 			INDArray e = epsilon.get(new INDArrayIndex[] { NDArrayIndex.point(i), NDArrayIndex.all(),
 					NDArrayIndex.interval(0, secondLastIdx + 1) });
@@ -204,7 +206,7 @@ public class AttentionVertex extends BaseGraphVertex {
 		// shape(timeLenthForK, timeLenthForQ)
 		INDArray alpha = k.transpose().mmul(q).div(Math.sqrt(dk));
 
-		Transforms.softmax(alpha, false);
+		softmax.getActivation(alpha, true);
 
 		return q.mmul(alpha.transpose());// shape(w2vLayerSize, timeLenthForK)
 	}
