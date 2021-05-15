@@ -54,13 +54,13 @@ public class ConditionalConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lr = 2e-4;
-	static double lr1 = lr * 0.1;
+	static double lrD = 1e-3;
+	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
 
-	static IUpdater updaterD = new RmsProp(lr);
-	static IUpdater updaterG = new RmsProp(lr1);
+	static IUpdater updaterD = new RmsProp(lrD);
+	static IUpdater updaterG = new RmsProp(lrG);
 
 	static int seed = 12345;
 	static int epochs = 200000;
@@ -68,7 +68,7 @@ public class ConditionalConvGanTrainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 100;
+	static int batchSize = 60;
 	static int vectorSize = 10;
 	static int numClasses = 10;
 
@@ -85,7 +85,7 @@ public class ConditionalConvGanTrainer {
 		ComputationGraph discriminator = null;
 
 		try {
-			File file = new File("D:\\soft\\test\\model\\Gan_original.zip");
+			File file = new File(PREFIX + "\\model\\Gan_original.zip");
 			MnistDataSetIterator trainDataSetIterator = new MnistDataSetIterator(batchSize, true, seed);
 
 			if (file.exists()) {
@@ -98,13 +98,16 @@ public class ConditionalConvGanTrainer {
 								InputType.feedForward(vectorSize + numClasses))
 
 						/* -------------------------Gz------------------------- */
-						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(16 * 16 * 32)
+						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(16 * 16 * 4)
 								.activation(Activation.RELU).weightInit(WeightInit.XAVIER).updater(updaterG).build(),
 								"z")
-						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 32)),
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
 								"Gz_1")
 
-						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
+						.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+								"Gz_ffToCnn")
+
+						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
 						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
 								"Gz_up_2")// width=30,height=30
 						.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
@@ -177,7 +180,7 @@ public class ConditionalConvGanTrainer {
 				discriminator.init();
 			}
 
-			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
+			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "ConditionalGan");
 
 			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
 
@@ -218,7 +221,7 @@ public class ConditionalConvGanTrainer {
 					System.out.println(discriminatorActivations.get("output_D(Gz)"));// 最后得平衡在0.5
 					System.out.println("-------------------------");
 
-					if (n % 2 == 0) {
+					if (n % 20 == 0) {
 						DataSet testDataSet = testDataSetIterator.next();
 						INDArray testX = testDataSet.getFeatures().castTo(dataType);
 						INDArray testLabel = testDataSet.getLabels().castTo(dataType);
@@ -238,7 +241,8 @@ public class ConditionalConvGanTrainer {
 
 						List<INDArray> list = new ArrayList<INDArray>();
 						for (int j = 0; j < gz.size(0); j++) {
-							INDArray a = gz.get(new INDArrayIndex[] { NDArrayIndex.point(j), NDArrayIndex.all() });
+							INDArray a = gz.get(new INDArrayIndex[] { NDArrayIndex.point(j), NDArrayIndex.all(),
+									NDArrayIndex.all(), NDArrayIndex.all() });
 							list.add(a);
 						}
 
@@ -246,8 +250,9 @@ public class ConditionalConvGanTrainer {
 						bestVisualizer.visualize();
 
 						writeImage(PREFIX + "\\aaaa_" + n + ".jpg", gz);
-						saveModel(discriminator, n);
 					}
+
+					saveModel(discriminator, n);
 
 					frozen(discriminator, true);
 
@@ -284,7 +289,7 @@ public class ConditionalConvGanTrainer {
 				String layerName = bl.getLayerName();
 				if (flag) {
 					if (layerName.startsWith("Gz_")) {
-						u.setLrAndSchedule(lr1, null);
+						u.setLrAndSchedule(lrG, null);
 					} else if (layerName.startsWith("D_")) {
 						u.setLrAndSchedule(0, null);
 					}
@@ -292,7 +297,7 @@ public class ConditionalConvGanTrainer {
 					if (layerName.startsWith("Gz_")) {
 						u.setLrAndSchedule(0, null);
 					} else if (layerName.startsWith("D_")) {
-						u.setLrAndSchedule(lr, null);
+						u.setLrAndSchedule(lrD, null);
 					}
 				}
 			}
@@ -320,8 +325,10 @@ public class ConditionalConvGanTrainer {
 		return image;
 	}
 
-	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
+	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
+		if (n % 2 == 0) {
+			discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
+		}
 	}
 
 }
