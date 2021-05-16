@@ -22,7 +22,6 @@ import org.deeplearning4j.nn.conf.layers.ActivationLayer;
 import org.deeplearning4j.nn.conf.layers.BatchNormalization;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
-import org.deeplearning4j.nn.conf.layers.DropoutLayer;
 import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToCnnPreProcessor;
 import org.deeplearning4j.nn.graph.ComputationGraph;
@@ -45,7 +44,8 @@ import personal.pan.dl4j.nn.conf.layers.NoParamOutputLayer;
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
- * Conditional Gan
+ * Conditional Gan<br />
+ * 待调优
  * 
  * @author Jerry
  *
@@ -54,7 +54,7 @@ public class ConditionalConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 1e-3;
+	static double lrD = 8e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -104,20 +104,20 @@ public class ConditionalConvGanTrainer {
 						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
 								"Gz_1")
 
-						.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
-								"Gz_ffToCnn")
+						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
 
-						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
 						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
-								"Gz_up_2")// width=30,height=30
+								"Gz_up_2")// width=32,height=32 -> width=30,height=30
+
 						.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
 								"Gz_conv_2")
+
 						.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 
 						.addLayer("Gz_final",
-								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.RELU)
+								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.SIGMOID)
 										.nOut(channels).build(),
-								"Gz_activation_2")// width=28,height=28
+								"Gz_activation_2")// width=30,height=30 -> width=28,height=28
 
 						/* -------------------------Gz------------------------- */
 
@@ -136,29 +136,22 @@ public class ConditionalConvGanTrainer {
 										.nIn(channels + numClasses).nOut(20).build(),
 								"stack")
 
-						.addLayer("D_bn_1", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
-								"D_conv_1")
-
-						.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_1")
-
-						.addLayer("D_dropout_1", new DropoutLayer(0.25), "D_activation_1")
+						.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_conv_1")
 
 						.addLayer("D_conv_2",
 								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50)
 										.build(),
-								"D_dropout_1")
+								"D_activation_1")
 
 						.addLayer("D_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
 								"D_conv_2")
 
 						.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
 
-						.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
-
 						.addLayer("D_final",
 								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
 										.build(),
-								"D_dropout_2")
+								"D_activation_2")
 
 						/* -------------------------D------------------------- */
 
@@ -271,6 +264,51 @@ public class ConditionalConvGanTrainer {
 				trainDataSetIterator.reset();
 				System.out.println("reset");
 			}
+		} catch (Exception | Error e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void test() {
+		try {
+			File file = new File(PREFIX + "\\model\\Gan_3060.zip");
+			ComputationGraph discriminator = ComputationGraph.load(file, true);
+
+			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
+
+			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "ConditionalGan");
+
+			while (testDataSetIterator.hasNext()) {
+				DataSet testDataSet = testDataSetIterator.next();
+				INDArray testX = testDataSet.getFeatures().castTo(dataType);
+				INDArray testLabel = testDataSet.getLabels().castTo(dataType);
+
+				long numTest = testX.size(0);
+
+				INDArray label4dTest = testLabel.reshape(numTest, testLabel.columns(), 1, 1);
+				INDArray ones4dTest = Nd4j.ones(dataType, new long[] { numTest, testLabel.columns(), height, width });
+
+				INDArray testY = ones4dTest.muli(label4dTest);
+				INDArray testZ = Nd4j.randn(dataType, new long[] { numTest, vectorSize });
+
+				Map<String, INDArray> generatorActivations = discriminator
+						.feedForward(new INDArray[] { testX, testY, Nd4j.hstack(testZ, testLabel) }, false);
+				INDArray gz = generatorActivations.get("Gz_final").dup();
+
+				List<INDArray> list = new ArrayList<INDArray>();
+				for (int j = 0; j < gz.size(0); j++) {
+					INDArray a = gz.get(new INDArrayIndex[] { NDArrayIndex.point(j), NDArrayIndex.all(),
+							NDArrayIndex.all(), NDArrayIndex.all() });
+					list.add(a);
+				}
+
+				bestVisualizer.setDigits(list);
+				bestVisualizer.visualize();
+
+				Thread.sleep(3000L);
+			}
+
+			testDataSetIterator.reset();
 		} catch (Exception | Error e) {
 			e.printStackTrace();
 		}
