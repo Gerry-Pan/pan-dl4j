@@ -23,6 +23,7 @@ import org.deeplearning4j.nn.conf.layers.BatchNormalization;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.DropoutLayer;
+import org.deeplearning4j.nn.conf.layers.LossLayer;
 import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 import org.deeplearning4j.nn.conf.preprocessor.CnnToFeedForwardPreProcessor;
 import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToCnnPreProcessor;
@@ -43,7 +44,6 @@ import org.nd4j.linalg.learning.config.RmsProp;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 import org.nd4j.linalg.lossfunctions.impl.LossWasserstein;
 
-import personal.pan.dl4j.nn.conf.layers.NoParamOutputLayer;
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
@@ -172,14 +172,8 @@ public class WassersteinConvGanTrainer {
 						.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
 						.addVertex("D(Gz)", new UnstackVertex(1, 2), "D_final")
 
-						.addLayer("output_D(x)",
-								new NoParamOutputLayer.Builder(LossFunction.WASSERSTEIN).updater(updaterD)
-										.activation(Activation.IDENTITY).nOut(1).build(),
-								"D(x)")
-						.addLayer("output_D(Gz)",
-								new NoParamOutputLayer.Builder(LossFunction.WASSERSTEIN).updater(updaterD)
-										.activation(Activation.IDENTITY).nOut(1).build(),
-								"D(Gz)")
+						.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.WASSERSTEIN).build(), "D(x)")
+						.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.WASSERSTEIN).build(), "D(Gz)")
 
 						.setOutputs("output_D(x)", "output_D(Gz)").build();
 

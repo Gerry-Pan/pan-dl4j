@@ -22,6 +22,7 @@ import org.deeplearning4j.nn.conf.layers.ActivationLayer;
 import org.deeplearning4j.nn.conf.layers.BatchNormalization;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.LossLayer;
 import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToCnnPreProcessor;
 import org.deeplearning4j.nn.graph.ComputationGraph;
@@ -40,12 +41,11 @@ import org.nd4j.linalg.learning.config.IUpdater;
 import org.nd4j.linalg.learning.config.RmsProp;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
-import personal.pan.dl4j.nn.conf.layers.NoParamOutputLayer;
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
  * Conditional Gan<br />
- * 待调优
+ * 调优中
  * 
  * @author Jerry
  *
@@ -54,13 +54,13 @@ public class ConditionalConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 8e-4;
+	static double lrD = 5e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
 
-	static IUpdater updaterD = new RmsProp(lrD);
-	static IUpdater updaterG = new RmsProp(lrG);
+	static IUpdater updaterD = new RmsProp.Builder().learningRate(lrD).build();
+	static IUpdater updaterG = new RmsProp.Builder().learningRate(lrG).rmsDecay(1e-8).build();
 
 	static int seed = 12345;
 	static int epochs = 200000;
@@ -71,6 +71,9 @@ public class ConditionalConvGanTrainer {
 	static int batchSize = 60;
 	static int vectorSize = 10;
 	static int numClasses = 10;
+
+	private ConditionalConvGanTrainer() {
+	}
 
 	public static void main(String[] args) {
 		train();
@@ -85,7 +88,7 @@ public class ConditionalConvGanTrainer {
 		ComputationGraph discriminator = null;
 
 		try {
-			File file = new File(PREFIX + "\\model\\Gan_original.zip");
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
 			MnistDataSetIterator trainDataSetIterator = new MnistDataSetIterator(batchSize, true, seed);
 
 			if (file.exists()) {
@@ -98,13 +101,23 @@ public class ConditionalConvGanTrainer {
 								InputType.feedForward(vectorSize + numClasses))
 
 						/* -------------------------Gz------------------------- */
-						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(16 * 16 * 4)
+						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(9 * 9 * 128)
 								.activation(Activation.RELU).weightInit(WeightInit.XAVIER).updater(updaterG).build(),
 								"z")
-						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(9, 9, 128)),
 								"Gz_1")
 
-						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
+						.addLayer("Gz_up_1", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=18,height=18
+
+						.addLayer("Gz_conv_1", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
+								"Gz_up_1")// width=18,height=18 -> width=16,height=16
+
+						.addLayer("Gz_bn_1", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+								"Gz_conv_1")
+
+						.addLayer("Gz_activation_1", new ActivationLayer(Activation.RELU), "Gz_bn_1")
+
+						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_activation_1")// width=32,height=32
 
 						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
 								"Gz_up_2")// width=32,height=32 -> width=30,height=30
@@ -149,7 +162,7 @@ public class ConditionalConvGanTrainer {
 						.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
 
 						.addLayer("D_final",
-								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
+								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(Activation.SIGMOID)
 										.build(),
 								"D_activation_2")
 
@@ -158,13 +171,9 @@ public class ConditionalConvGanTrainer {
 						.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
 						.addVertex("D(Gz)", new UnstackVertex(1, 2), "D_final")
 
-						.addLayer("output_D(x)",
-								new NoParamOutputLayer.Builder(LossFunction.XENT).updater(updaterD)
-										.activation(Activation.SIGMOID).nOut(1).build(),
+						.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.XENT).updater(updaterD).build(),
 								"D(x)")
-						.addLayer("output_D(Gz)",
-								new NoParamOutputLayer.Builder(LossFunction.XENT).updater(updaterD)
-										.activation(Activation.SIGMOID).nOut(1).build(),
+						.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.XENT).updater(updaterD).build(),
 								"D(Gz)")
 
 						.setOutputs("output_D(x)", "output_D(Gz)").build();
@@ -271,7 +280,7 @@ public class ConditionalConvGanTrainer {
 
 	public static void test() {
 		try {
-			File file = new File(PREFIX + "\\model\\Gan_3060.zip");
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
 			ComputationGraph discriminator = ComputationGraph.load(file, true);
 
 			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
