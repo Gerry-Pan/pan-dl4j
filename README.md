@@ -10,7 +10,7 @@
 <br />
 ![image](https://user-images.githubusercontent.com/35036729/115952807-c05d3a00-a51a-11eb-9555-05aa68e0e2ce.png)
 
-1、Generator和Discriminator使用Dense
+**1、Generator和Discriminator使用Dense**
 <br />
 https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4j/examples/gan/GanTrainer.java
 <br />
@@ -20,7 +20,7 @@ https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4
 ![输入图片说明](https://images.gitee.com/uploads/images/2021/0422/084047_e42588ce_673907.png "QQ图片20210422083446.png")
 ![输入图片说明](https://images.gitee.com/uploads/images/2021/0422/084313_23216ff4_673907.png "QQ图片20210422083521.png")
 
-2、Generator使用上采样和Cnn，Discriminator使用Cnn
+**2、Generator使用上采样和Cnn，Discriminator使用Cnn**
 <br />
 https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4j/examples/gan/ConvGanTrainer.java
 <br />
@@ -28,3 +28,9 @@ https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4
 训练效果：
 <br />
 ![image](https://user-images.githubusercontent.com/35036729/115952776-94da4f80-a51a-11eb-8ab6-87360f25720f.png)
+<br />
+<br />
+进一步调优训练结果，笔画更清晰：
+<br />
+![QQ图片20210518071401](https://user-images.githubusercontent.com/35036729/118568156-cbb62500-b7a9-11eb-85a7-334477f64456.png)
+![QQ图片20210518071407](https://user-images.githubusercontent.com/35036729/118568159-cce75200-b7a9-11eb-9c3e-4e85ce0ce89a.png)
