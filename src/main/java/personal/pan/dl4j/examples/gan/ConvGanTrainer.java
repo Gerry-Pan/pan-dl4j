@@ -47,7 +47,7 @@ public class ConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 1e-3;
+	static double lrD = 8e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -61,7 +61,7 @@ public class ConvGanTrainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 200;
+	static int batchSize = 100;
 	static int vectorSize = 10;
 
 	private ConvGanTrainer() {
@@ -110,7 +110,7 @@ public class ConvGanTrainer {
 						.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 
 						.addLayer("Gz_conv_3",
-								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.RELU)
+								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.SIGMOID)
 										.nOut(channels).build(),
 								"Gz_activation_2")// width=28,height=28
 
@@ -128,7 +128,7 @@ public class ConvGanTrainer {
 								"stack")
 
 						.addLayer("D_conv_1",
-								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(32)
+								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(20)
 										.build(),
 								"D_cnnToFf")
 
@@ -140,7 +140,7 @@ public class ConvGanTrainer {
 						.addLayer("D_dropout_1", new DropoutLayer(0.25), "D_activation_1")
 
 						.addLayer("D_conv_2",
-								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(32).nOut(64)
+								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50)
 										.build(),
 								"D_dropout_1")
 
@@ -151,12 +151,10 @@ public class ConvGanTrainer {
 
 						.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
 
-						.addLayer("D_dense",
-								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
+						.addLayer("D_final",
+								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(Activation.SIGMOID)
 										.build(),
 								"D_dropout_2")
-
-						.addLayer("D_final", new ActivationLayer(Activation.SIGMOID), "D_dense")
 
 						/* -------------------------D------------------------- */
 
