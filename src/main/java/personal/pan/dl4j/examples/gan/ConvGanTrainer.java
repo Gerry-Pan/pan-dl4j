@@ -47,7 +47,7 @@ public class ConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 0.001;
+	static double lrD = 1e-3;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -61,7 +61,7 @@ public class ConvGanTrainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 100;
+	static int batchSize = 200;
 	static int vectorSize = 10;
 
 	private ConvGanTrainer() {
@@ -80,86 +80,97 @@ public class ConvGanTrainer {
 		ComputationGraph discriminator = null;
 
 		try {
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
 			MnistDataSetIterator trainDataSetIterator = new MnistDataSetIterator(batchSize, true, seed);
 
-			ComputationGraphConfiguration graphConfiguration = new NeuralNetConfiguration.Builder().seed(seed)
-					.dataType(dataType).weightInit(WeightInit.XAVIER).graphBuilder().addInputs("x", "z")
-					.setInputTypes(InputType.feedForward(height * width * channels), InputType.feedForward(vectorSize))
+			if (file.exists()) {
+				discriminator = ComputationGraph.load(file, true);
+			} else {
+				ComputationGraphConfiguration graphConfiguration = new NeuralNetConfiguration.Builder().seed(seed)
+						.dataType(dataType).weightInit(WeightInit.XAVIER).graphBuilder().addInputs("x", "z")
+						.setInputTypes(InputType.feedForward(height * width * channels),
+								InputType.feedForward(vectorSize))
 
-					/* -------------------------Gz------------------------- */
-					.addLayer("Gz_1",
-							new DenseLayer.Builder().nIn(vectorSize).nOut(16 * 16 * 4).activation(Activation.RELU)
-									.weightInit(WeightInit.XAVIER).updater(updaterG).build(),
-							"z")
-					.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
-							"Gz_1")
+						/* -------------------------Gz------------------------- */
+						.addLayer("Gz_1",
+								new DenseLayer.Builder().nIn(vectorSize).nOut(16 * 16 * 4).activation(Activation.RELU)
+										.weightInit(WeightInit.XAVIER).updater(updaterG).build(),
+								"z")
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
+								"Gz_1")
 
-					.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
-							"Gz_ffToCnn")
+						.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+								"Gz_ffToCnn")
 
-					.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
-					.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
-							"Gz_up_2")// width=30,height=30
-					.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
-							"Gz_conv_2")
-					.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
+						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
+						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
+								"Gz_up_2")// width=30,height=30
+						.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+								"Gz_conv_2")
+						.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 
-					.addLayer("Gz_conv_3",
-							new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.RELU)
-									.nOut(channels).build(),
-							"Gz_activation_2")// width=28,height=28
+						.addLayer("Gz_conv_3",
+								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.RELU)
+										.nOut(channels).build(),
+								"Gz_activation_2")// width=28,height=28
 
-					.addVertex("Gz_final",
-							new PreprocessorVertex(new CnnToFeedForwardPreProcessor(height, width, channels)),
-							"Gz_conv_3")
+						.addVertex("Gz_final",
+								new PreprocessorVertex(new CnnToFeedForwardPreProcessor(height, width, channels)),
+								"Gz_conv_3")
 
-					/* -------------------------Gz------------------------- */
+						/* -------------------------Gz------------------------- */
 
-					.addVertex("stack", new StackVertex(), "x", "Gz_final")
+						.addVertex("stack", new StackVertex(), "x", "Gz_final")
 
-					/* -------------------------D------------------------- */
-					.addVertex("D_cnnToFf",
-							new PreprocessorVertex(new FeedForwardToCnnPreProcessor(height, width, channels)), "stack")
+						/* -------------------------D------------------------- */
+						.addVertex("D_cnnToFf",
+								new PreprocessorVertex(new FeedForwardToCnnPreProcessor(height, width, channels)),
+								"stack")
 
-					.addLayer("D_conv_1",
-							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(20)
-									.build(),
-							"D_cnnToFf")
+						.addLayer("D_conv_1",
+								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(channels).nOut(32)
+										.build(),
+								"D_cnnToFf")
 
-					.addLayer("D_bn_1", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
-							"D_conv_1")
+						.addLayer("D_bn_1", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
+								"D_conv_1")
 
-					.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_1")
+						.addLayer("D_activation_1", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_1")
 
-					.addLayer("D_dropout_1", new DropoutLayer(0.25), "D_activation_1")
+						.addLayer("D_dropout_1", new DropoutLayer(0.25), "D_activation_1")
 
-					.addLayer("D_conv_2",
-							new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(20).nOut(50).build(),
-							"D_dropout_1")
+						.addLayer("D_conv_2",
+								new ConvolutionLayer.Builder(5, 5).updater(updaterD).stride(1, 1).nIn(32).nOut(64)
+										.build(),
+								"D_dropout_1")
 
-					.addLayer("D_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
-							"D_conv_2")
+						.addLayer("D_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterD).build(),
+								"D_conv_2")
 
-					.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
+						.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
 
-					.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
+						.addLayer("D_dropout_2", new DropoutLayer(0.25), "D_activation_2")
 
-					.addLayer("D_final",
-							new DenseLayer.Builder().nOut(1).updater(updaterD).activation(Activation.SIGMOID).build(),
-							"D_dropout_2")
+						.addLayer("D_dense",
+								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
+										.build(),
+								"D_dropout_2")
 
-					/* -------------------------D------------------------- */
+						.addLayer("D_final", new ActivationLayer(Activation.SIGMOID), "D_dense")
 
-					.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
-					.addVertex("D(Gz)", new UnstackVertex(1, 2), "D_final")
+						/* -------------------------D------------------------- */
 
-					.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.XENT).build(), "D(x)")
-					.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.XENT).build(), "D(Gz)")
+						.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
+						.addVertex("D(Gz)", new UnstackVertex(1, 2), "D_final")
 
-					.setOutputs("output_D(x)", "output_D(Gz)").build();
+						.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.XENT).build(), "D(x)")
+						.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.XENT).build(), "D(Gz)")
 
-			discriminator = new ComputationGraph(graphConfiguration);
-			discriminator.init();
+						.setOutputs("output_D(x)", "output_D(Gz)").build();
+
+				discriminator = new ComputationGraph(graphConfiguration);
+				discriminator.init();
+			}
 
 			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
 
@@ -192,7 +203,7 @@ public class ConvGanTrainer {
 					System.out.println(discriminatorActivations.get("output_D(Gz)"));// 最后得平衡在0.5
 					System.out.println("-------------------------");
 
-					if (n % 2 == 0) {
+					if (n % 50 == 0) {
 						INDArray testX = testDataSetIterator.next().getFeatures().castTo(dataType);
 						INDArray z = Nd4j.randn(dataType, new long[] { testX.size(0), vectorSize });
 
@@ -227,6 +238,9 @@ public class ConvGanTrainer {
 
 					n++;
 				}
+
+				trainDataSetIterator.reset();
+				System.out.println("reset");
 			}
 		} catch (Exception | Error e) {
 			e.printStackTrace();
@@ -282,8 +296,8 @@ public class ConvGanTrainer {
 		return image;
 	}
 
-	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
+	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
+		discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
 	}
 
 }

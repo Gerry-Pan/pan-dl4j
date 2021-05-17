@@ -44,7 +44,7 @@ import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
- * 在{@link ConvGanTrainer} 的基础上去除Gz_bn层，将Gz_1的单元数改为16 * 16 * 32
+ * 在{@link ConvGanTrainer} 的基础上去除Gz_bn层
  * 
  * @author Jerry
  *
@@ -53,13 +53,13 @@ public class ConvGan1Trainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lr = 0.001;
-	static double lr1 = lr * 0.1;
+	static double lrD = 1e-3;
+	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
 
-	static IUpdater updaterD = new RmsProp(lr);
-	static IUpdater updaterG = new RmsProp(lr1);
+	static IUpdater updaterD = new RmsProp(lrD);
+	static IUpdater updaterG = new RmsProp.Builder().learningRate(lrG).rmsDecay(1e-8).build();
 
 	static int seed = 12345;
 	static int epochs = 200000;
@@ -67,7 +67,7 @@ public class ConvGan1Trainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 100;
+	static int batchSize = 200;
 	static int vectorSize = 10;
 
 	private ConvGan1Trainer() {
@@ -86,7 +86,7 @@ public class ConvGan1Trainer {
 		ComputationGraph discriminator = null;
 
 		try {
-			File file = new File("D:\\soft\\test\\model\\Gan_original.zip");
+			File file = new File("D:\\soft\\test\\model\\Gan_model.zip");
 			MnistDataSetIterator trainDataSetIterator = new MnistDataSetIterator(batchSize, true, seed);
 
 			if (file.exists()) {
@@ -99,10 +99,10 @@ public class ConvGan1Trainer {
 
 						/* -------------------------Gz------------------------- */
 						.addLayer("Gz_1",
-								new DenseLayer.Builder().nIn(vectorSize).nOut(16 * 16 * 32).activation(Activation.RELU)
+								new DenseLayer.Builder().nIn(vectorSize).nOut(16 * 16 * 4).activation(Activation.RELU)
 										.weightInit(WeightInit.XAVIER).updater(updaterG).build(),
 								"z")
-						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 32)),
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
 								"Gz_1")
 
 						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
@@ -204,7 +204,7 @@ public class ConvGan1Trainer {
 					System.out.println(discriminatorActivations.get("output_D(Gz)"));// 最后得平衡在0.5
 					System.out.println("-------------------------");
 
-					if (n % 2 == 0) {
+					if (n % 20 == 0) {
 						INDArray testX = testDataSetIterator.next().getFeatures().castTo(dataType);
 						INDArray z = Nd4j.randn(dataType, new long[] { testX.size(0), vectorSize });
 
@@ -239,6 +239,9 @@ public class ConvGan1Trainer {
 
 					n++;
 				}
+
+				trainDataSetIterator.reset();
+				System.out.println("reset");
 			}
 		} catch (Exception | Error e) {
 			e.printStackTrace();
@@ -258,7 +261,7 @@ public class ConvGan1Trainer {
 				String layerName = bl.getLayerName();
 				if (flag) {
 					if (layerName.startsWith("Gz_")) {
-						u.setLrAndSchedule(lr1, null);
+						u.setLrAndSchedule(lrG, null);
 					} else if (layerName.startsWith("D_")) {
 						u.setLrAndSchedule(0, null);
 					}
@@ -266,7 +269,7 @@ public class ConvGan1Trainer {
 					if (layerName.startsWith("Gz_")) {
 						u.setLrAndSchedule(0, null);
 					} else if (layerName.startsWith("D_")) {
-						u.setLrAndSchedule(lr, null);
+						u.setLrAndSchedule(lrD, null);
 					}
 				}
 			}
@@ -294,8 +297,8 @@ public class ConvGan1Trainer {
 		return image;
 	}
 
-	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-//		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
+	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
+		discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
 	}
 
 }

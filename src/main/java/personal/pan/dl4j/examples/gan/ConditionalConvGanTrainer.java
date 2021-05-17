@@ -161,10 +161,12 @@ public class ConditionalConvGanTrainer {
 
 						.addLayer("D_activation_2", new ActivationLayer(new ActivationLReLU(0.2)), "D_bn_2")
 
-						.addLayer("D_final",
-								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(Activation.SIGMOID)
+						.addLayer("D_dense",
+								new DenseLayer.Builder().nOut(1).updater(updaterD).activation(new ActivationLReLU(0.2))
 										.build(),
 								"D_activation_2")
+
+						.addLayer("D_final", new ActivationLayer(Activation.SIGMOID), "D_dense")
 
 						/* -------------------------D------------------------- */
 
@@ -223,7 +225,7 @@ public class ConditionalConvGanTrainer {
 					System.out.println(discriminatorActivations.get("output_D(Gz)"));// 最后得平衡在0.5
 					System.out.println("-------------------------");
 
-					if (n % 20 == 0) {
+					if (n % 10 == 0) {
 						DataSet testDataSet = testDataSetIterator.next();
 						INDArray testX = testDataSet.getFeatures().castTo(dataType);
 						INDArray testLabel = testDataSet.getLabels().castTo(dataType);

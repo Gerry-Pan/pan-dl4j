@@ -16,6 +16,7 @@ import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.graph.StackVertex;
 import org.deeplearning4j.nn.conf.graph.UnstackVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.ActivationLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.LossLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
@@ -97,10 +98,12 @@ public class GanTrainer {
 							new DenseLayer.Builder().nIn(256).nOut(128).activation(Activation.LEAKYRELU)
 									.weightInit(WeightInit.XAVIER).updater(updaterD).build(),
 							"D_1")
-					.addLayer("D_final",
-							new DenseLayer.Builder().nIn(128).nOut(1).activation(Activation.SIGMOID)
+					.addLayer("D_3",
+							new DenseLayer.Builder().nIn(128).nOut(1).activation(Activation.LEAKYRELU)
 									.weightInit(WeightInit.XAVIER).updater(updaterD).build(),
 							"D_2")
+
+					.addLayer("D_final", new ActivationLayer(Activation.SIGMOID), "D_3")
 					/* -------------------------D------------------------- */
 
 					.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
@@ -185,6 +188,9 @@ public class GanTrainer {
 
 					n++;
 				}
+
+				trainDataSetIterator.reset();
+				System.out.println("reset");
 			}
 		} catch (Exception | Error e) {
 			e.printStackTrace();
