@@ -35,11 +35,18 @@ import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
+/**
+ * 使用dense实现的经典GAN<br />
+ * 使用StackVertex实现真实和生成数据在discriminator的参数共享
+ * 
+ * @author Jerry
+ *
+ */
 public class GanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 0.001;
+	static double lrD = 8e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -57,10 +64,6 @@ public class GanTrainer {
 	static int vectorSize = 20;
 
 	private GanTrainer() {
-	}
-
-	public static void main(String[] args) {
-		train();
 	}
 
 	/**
@@ -117,7 +120,6 @@ public class GanTrainer {
 			discriminator = new ComputationGraph(discriminatorConfig);
 			discriminator.init();
 
-			boolean flag = false;
 			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
 
 			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
@@ -171,20 +173,16 @@ public class GanTrainer {
 
 					saveModel(discriminator, n);
 
-					flag = true;
-
-					frozen(discriminator, flag);
+					frozen(discriminator, true);
 
 					MultiDataSet dataSetG = new org.nd4j.linalg.dataset.MultiDataSet(new INDArray[] { inputX, inputZ },
 							new INDArray[] { labelDx, labelDgzT });
 
-					for (int k = 0; k < 20; k++) {
+					for (int k = 0; k < 10; k++) {
 						discriminator.fit(dataSetG);
 					}
 
-					flag = false;
-
-					frozen(discriminator, flag);
+					frozen(discriminator, false);
 
 					n++;
 				}
@@ -197,6 +195,13 @@ public class GanTrainer {
 		}
 	}
 
+	/**
+	 * flag为true，冻结discriminator<br />
+	 * flag为false，冻结generator
+	 * 
+	 * @param discriminator
+	 * @param flag
+	 */
 	@SuppressWarnings("rawtypes")
 	static void frozen(ComputationGraph discriminator, boolean flag) {
 		Layer[] layers = discriminator.getLayers();
@@ -246,8 +251,8 @@ public class GanTrainer {
 		return image;
 	}
 
-	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-//		discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
+	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
+		discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
 	}
 
 }
