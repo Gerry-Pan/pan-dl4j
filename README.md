@@ -34,3 +34,19 @@ https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4
 <br />
 ![QQ图片20210518071401](https://user-images.githubusercontent.com/35036729/118568156-cbb62500-b7a9-11eb-85a7-334477f64456.png)
 ![QQ图片20210518071407](https://user-images.githubusercontent.com/35036729/118568159-cce75200-b7a9-11eb-9c3e-4e85ce0ce89a.png)
+
+### CGan示例
+**1、Generator使用上采样和Cnn，Discriminator使用Cnn**
+<br />
+https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4j/examples/gan/ConditionalConvGanTrainer.java
+<br />
+<br />
+训练效果：
+<br />
+![QQ图片20210518224427](https://user-images.githubusercontent.com/35036729/118673200-673baa00-b82b-11eb-9cc3-031b1e23a493.png)
+![QQ图片20210518224430](https://user-images.githubusercontent.com/35036729/118673218-69056d80-b82b-11eb-97db-0f5098e4f8ce.png)
+![QQ图片20210518224436](https://user-images.githubusercontent.com/35036729/118673222-699e0400-b82b-11eb-9fd3-76cdc358cd21.png)
+
+
+
+
