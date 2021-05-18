@@ -45,16 +45,16 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
  * Conditional Gan<br />
- * 调优中
+ * 使用StackVertex实现真实和生成数据在discriminator的参数共享
  * 
- * @author Jerry
+ * @author Gerry
  *
  */
 public class ConditionalConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 5e-4;
+	static double lrD = 8e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -68,15 +68,11 @@ public class ConditionalConvGanTrainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 60;
+	static int batchSize = 100;
 	static int vectorSize = 10;
 	static int numClasses = 10;
 
 	private ConditionalConvGanTrainer() {
-	}
-
-	public static void main(String[] args) {
-		train();
 	}
 
 	/**
@@ -101,10 +97,10 @@ public class ConditionalConvGanTrainer {
 								InputType.feedForward(vectorSize + numClasses))
 
 						/* -------------------------Gz------------------------- */
-						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(9 * 9 * 128)
+						.addLayer("Gz_1", new DenseLayer.Builder().nIn(vectorSize + numClasses).nOut(9 * 9 * 4)
 								.activation(Activation.RELU).weightInit(WeightInit.XAVIER).updater(updaterG).build(),
 								"z")
-						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(9, 9, 128)),
+						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(9, 9, 4)),
 								"Gz_1")
 
 						.addLayer("Gz_up_1", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=18,height=18
@@ -173,10 +169,8 @@ public class ConditionalConvGanTrainer {
 						.addVertex("D(x)", new UnstackVertex(0, 2), "D_final")
 						.addVertex("D(Gz)", new UnstackVertex(1, 2), "D_final")
 
-						.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.XENT).updater(updaterD).build(),
-								"D(x)")
-						.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.XENT).updater(updaterD).build(),
-								"D(Gz)")
+						.addLayer("output_D(x)", new LossLayer.Builder(LossFunction.XENT).build(), "D(x)")
+						.addLayer("output_D(Gz)", new LossLayer.Builder(LossFunction.XENT).build(), "D(Gz)")
 
 						.setOutputs("output_D(x)", "output_D(Gz)").build();
 
@@ -210,7 +204,7 @@ public class ConditionalConvGanTrainer {
 					INDArray label4d = label.reshape(num, label.columns(), 1, 1);
 					INDArray ones4d = Nd4j.ones(dataType, new long[] { num, label.columns(), height, width });
 
-					INDArray inputY = ones4d.muli(label4d);
+					INDArray inputY = ones4d.mul(label4d);
 					INDArray h = Nd4j.hstack(inputZ, label);
 
 					MultiDataSet dataSetD = new org.nd4j.linalg.dataset.MultiDataSet(
@@ -236,7 +230,7 @@ public class ConditionalConvGanTrainer {
 						INDArray ones4dTest = Nd4j.ones(dataType,
 								new long[] { numTest, testLabel.columns(), height, width });
 
-						INDArray testY = ones4dTest.muli(label4dTest);
+						INDArray testY = ones4dTest.mul(label4dTest);
 						INDArray testZ = Nd4j.randn(dataType, new long[] { numTest, vectorSize });
 
 						Map<String, INDArray> generatorActivations = discriminator
@@ -253,7 +247,7 @@ public class ConditionalConvGanTrainer {
 						bestVisualizer.setDigits(list);
 						bestVisualizer.visualize();
 
-						writeImage(PREFIX + "\\aaaa_" + n + ".jpg", gz);
+						writeImage(PREFIX + "\\gan_" + n + ".jpg", gz);
 					}
 
 					saveModel(discriminator, n);
@@ -263,7 +257,7 @@ public class ConditionalConvGanTrainer {
 					MultiDataSet dataSetG = new org.nd4j.linalg.dataset.MultiDataSet(
 							new INDArray[] { inputX, inputY, h }, new INDArray[] { labelDx, labelDgzT });
 
-					for (int k = 0; k < 20; k++) {
+					for (int k = 0; k < 10; k++) {
 						discriminator.fit(dataSetG);
 					}
 
@@ -325,6 +319,13 @@ public class ConditionalConvGanTrainer {
 		}
 	}
 
+	/**
+	 * flag为true，冻结discriminator<br />
+	 * flag为false，冻结generator
+	 * 
+	 * @param discriminator
+	 * @param flag
+	 */
 	@SuppressWarnings("rawtypes")
 	static void frozen(ComputationGraph discriminator, boolean flag) {
 		Layer[] layers = discriminator.getLayers();
@@ -375,9 +376,7 @@ public class ConditionalConvGanTrainer {
 	}
 
 	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
-		if (n % 2 == 0) {
-			discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
-		}
+		discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
 	}
 
 }
