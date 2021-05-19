@@ -52,7 +52,6 @@ import personal.pan.dl4j.nn.visual.MNISTVisualizer;
  * Discriminator使用Cnn，输出层损失函数使用{@link LossWasserstein} <br />
  * Generator使用上采样和Cnn，Generator的最后一层激活函数使用SIGMOID<br />
  * <br />
- * D(x)和D(Gz)的差值需要接近0<br />
  * 
  * @author Gerry
  *
@@ -61,7 +60,7 @@ public class WassersteinConvGanTrainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 2e-4;
+	static double lrD = 8e-4;
 	static double lrG = lrD * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
@@ -75,15 +74,11 @@ public class WassersteinConvGanTrainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 200;
+	static int batchSize = 100;
 	static int vectorSize = 10;
 	static double gt = 0.01;
 
 	private WassersteinConvGanTrainer() {
-	}
-
-	public static void main(String[] args) {
-		train();
 	}
 
 	/**
@@ -95,7 +90,7 @@ public class WassersteinConvGanTrainer {
 		ComputationGraph discriminator = null;
 
 		try {
-			File file = new File(PREFIX + "\\model\\Gan_original.zip");
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
 			MnistDataSetIterator trainDataSetIterator = new MnistDataSetIterator(batchSize, true, seed);
 
 			if (file.exists()) {
@@ -212,7 +207,7 @@ public class WassersteinConvGanTrainer {
 					INDArray D_x = discriminatorActivations.get("output_D(x)");
 					INDArray D_Gz = discriminatorActivations.get("output_D(Gz)");
 
-					System.out.println(D_x.sub(D_Gz));// 需要趋于0
+					System.out.println(D_x.sub(D_Gz));
 					System.out.println("-------------------------");
 
 					if (n % 10 == 0) {
@@ -243,7 +238,7 @@ public class WassersteinConvGanTrainer {
 					MultiDataSet dataSetG = new org.nd4j.linalg.dataset.MultiDataSet(new INDArray[] { inputX, inputZ },
 							new INDArray[] { labelDx, labelDgzT });
 
-					for (int k = 0; k < 30; k++) {
+					for (int k = 0; k < 10; k++) {
 						discriminator.fit(dataSetG);
 					}
 
@@ -261,6 +256,49 @@ public class WassersteinConvGanTrainer {
 		}
 	}
 
+	public static void test() {
+		try {
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
+			ComputationGraph discriminator = ComputationGraph.load(file, true);
+
+			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
+
+			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "WassersteinGan");
+
+			while (testDataSetIterator.hasNext()) {
+				DataSet testDataSet = testDataSetIterator.next();
+				INDArray testX = testDataSet.getFeatures().castTo(dataType);
+				INDArray z = Nd4j.randn(dataType, new long[] { testX.size(0), vectorSize });
+
+				Map<String, INDArray> generatorActivations = discriminator.feedForward(new INDArray[] { testX, z },
+						false);
+				INDArray gz = generatorActivations.get("Gz_final").dup();
+
+				List<INDArray> list = new ArrayList<INDArray>();
+				for (int j = 0; j < gz.size(0); j++) {
+					INDArray a = gz.get(new INDArrayIndex[] { NDArrayIndex.point(j), NDArrayIndex.all() });
+					list.add(a);
+				}
+
+				bestVisualizer.setDigits(list);
+				bestVisualizer.visualize();
+
+				Thread.sleep(3000L);
+			}
+
+			testDataSetIterator.reset();
+		} catch (Exception | Error e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * flag为true，冻结discriminator<br />
+	 * flag为false，冻结generator
+	 * 
+	 * @param discriminator
+	 * @param flag
+	 */
 	@SuppressWarnings("rawtypes")
 	static void frozen(ComputationGraph discriminator, boolean flag) {
 		Layer[] layers = discriminator.getLayers();
@@ -334,9 +372,12 @@ public class WassersteinConvGanTrainer {
 		}
 	}
 
-	static void saveModel(ComputationGraph discriminator, int i) throws Exception {
-		if (i % 5 == 0) {
-			discriminator.save(new File(PREFIX + "\\model\\Gan_" + i + ".zip"));
+	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
+		if (n % 2 == 0) {
+			discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
+		}
+		if (n == 9000) {
+			System.exit(0);
 		}
 	}
 
