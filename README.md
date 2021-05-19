@@ -1,7 +1,8 @@
 ### GRU
 
-2017年12月，在dl4j基础上实现一些算法，现根据GRU前向公式推导反向公式，并在dl4j中实现。
+2017年12月，在dl4j基础上实现一些算法，根据GRU前向公式推导反向公式，并在dl4j中实现。
 <br />
+https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4j/nn/layers/recurrent/GRUHelpers.java
 <br />
 
 ### Gan示例
@@ -47,6 +48,15 @@ https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4
 ![QQ图片20210518224430](https://user-images.githubusercontent.com/35036729/118673218-69056d80-b82b-11eb-97db-0f5098e4f8ce.png)
 ![QQ图片20210518224436](https://user-images.githubusercontent.com/35036729/118673222-699e0400-b82b-11eb-9fd3-76cdc358cd21.png)
 
+### WGan示例
+**1、Generator使用上采样和Cnn，Discriminator使用Cnn**
+<br />
+https://github.com/Gerry-Pan/pan-dl4j/blob/master/src/main/java/personal/pan/dl4j/examples/gan/WassersteinConvGanTrainer.java
+<br />
+<br />
+训练效果（效果欠佳，有待改善）：
+<br />
+![QQ图片20210519232337](https://user-images.githubusercontent.com/35036729/118840314-dda6dd80-b8f9-11eb-8adf-7f03fa40cba8.png)
+![QQ图片20210519232351](https://user-images.githubusercontent.com/35036729/118840327-e0093780-b8f9-11eb-990d-461bbccc7903.png)
 
-
-
+<br />
