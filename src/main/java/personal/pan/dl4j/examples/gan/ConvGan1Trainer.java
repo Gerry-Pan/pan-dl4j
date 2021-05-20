@@ -34,6 +34,7 @@ import org.nd4j.linalg.activations.impl.ActivationLReLU;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.MultiDataSet;
+import org.nd4j.linalg.dataset.api.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.INDArrayIndex;
 import org.nd4j.linalg.indexing.NDArrayIndex;
@@ -44,7 +45,7 @@ import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 import personal.pan.dl4j.nn.visual.MNISTVisualizer;
 
 /**
- * 在{@link ConvGanTrainer} 的基础上去除Gz_bn层
+ * 在{@link ConvGanTrainer} 的基础上将discriminator和generator的学习率和fit次数对换
  * 
  * @author Jerry
  *
@@ -53,8 +54,8 @@ public class ConvGan1Trainer {
 
 	private final static String PREFIX = "D:\\soft\\test\\generator";
 
-	static double lrD = 1e-3;
-	static double lrG = lrD * 0.1;
+	static double lrG = 8e-4;
+	static double lrD = lrG * 0.1;
 
 	static DataType dataType = DataType.FLOAT;
 
@@ -67,7 +68,7 @@ public class ConvGan1Trainer {
 	static int height = 28;
 	static int width = 28;
 	static int channels = 1;
-	static int batchSize = 200;
+	static int batchSize = 100;
 	static int vectorSize = 10;
 
 	private ConvGan1Trainer() {
@@ -105,7 +106,10 @@ public class ConvGan1Trainer {
 						.addVertex("Gz_ffToCnn", new PreprocessorVertex(new FeedForwardToCnnPreProcessor(16, 16, 4)),
 								"Gz_1")
 
-						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_ffToCnn")// width=32,height=32
+						.addLayer("Gz_bn", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
+								"Gz_ffToCnn")
+
+						.addLayer("Gz_up_2", new Upsampling2D.Builder(2).build(), "Gz_bn")// width=32,height=32
 						.addLayer("Gz_conv_2", new ConvolutionLayer.Builder(3, 3).updater(updaterG).nOut(64).build(),
 								"Gz_up_2")// width=30,height=30
 						.addLayer("Gz_bn_2", new BatchNormalization.Builder().decay(0.8).updater(updaterG).build(),
@@ -113,7 +117,7 @@ public class ConvGan1Trainer {
 						.addLayer("Gz_activation_2", new ActivationLayer(Activation.RELU), "Gz_bn_2")
 
 						.addLayer("Gz_conv_3",
-								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.RELU)
+								new ConvolutionLayer.Builder(3, 3).updater(updaterG).activation(Activation.SIGMOID)
 										.nOut(channels).build(),
 								"Gz_activation_2")// width=28,height=28
 
@@ -195,7 +199,7 @@ public class ConvGan1Trainer {
 					MultiDataSet dataSetD = new org.nd4j.linalg.dataset.MultiDataSet(new INDArray[] { inputX, inputZ },
 							new INDArray[] { labelDx, labelDgz });
 
-					for (int k = 0; k < 1; k++) {
+					for (int k = 0; k < 10; k++) {
 						discriminator.fit(dataSetD);
 					}
 
@@ -231,7 +235,7 @@ public class ConvGan1Trainer {
 					MultiDataSet dataSetG = new org.nd4j.linalg.dataset.MultiDataSet(new INDArray[] { inputX, inputZ },
 							new INDArray[] { labelDx, labelDgzT });
 
-					for (int k = 0; k < 20; k++) {
+					for (int k = 0; k < 1; k++) {
 						discriminator.fit(dataSetG);
 					}
 
@@ -243,6 +247,42 @@ public class ConvGan1Trainer {
 				trainDataSetIterator.reset();
 				System.out.println("reset");
 			}
+		} catch (Exception | Error e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void test() {
+		try {
+			File file = new File(PREFIX + "\\model\\Gan_model.zip");
+			ComputationGraph discriminator = ComputationGraph.load(file, true);
+
+			MnistDataSetIterator testDataSetIterator = new MnistDataSetIterator(30, false, seed);
+
+			MNISTVisualizer bestVisualizer = new MNISTVisualizer(1, "Gan");
+
+			while (testDataSetIterator.hasNext()) {
+				DataSet testDataSet = testDataSetIterator.next();
+				INDArray testX = testDataSet.getFeatures().castTo(dataType);
+				INDArray z = Nd4j.randn(dataType, new long[] { testX.size(0), vectorSize });
+
+				Map<String, INDArray> generatorActivations = discriminator.feedForward(new INDArray[] { testX, z },
+						false);
+				INDArray gz = generatorActivations.get("Gz_final").dup();
+
+				List<INDArray> list = new ArrayList<INDArray>();
+				for (int j = 0; j < gz.size(0); j++) {
+					INDArray a = gz.get(new INDArrayIndex[] { NDArrayIndex.point(j), NDArrayIndex.all() });
+					list.add(a);
+				}
+
+				bestVisualizer.setDigits(list);
+				bestVisualizer.visualize();
+
+				Thread.sleep(3000L);
+			}
+
+			testDataSetIterator.reset();
 		} catch (Exception | Error e) {
 			e.printStackTrace();
 		}
@@ -299,6 +339,9 @@ public class ConvGan1Trainer {
 
 	static void saveModel(ComputationGraph discriminator, int n) throws Exception {
 		discriminator.save(new File(PREFIX + "\\model\\Gan_" + n + ".zip"));
+		if (n == 4800) {
+			System.exit(0);
+		}
 	}
 
 }
